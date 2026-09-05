@@ -1,0 +1,18 @@
+services:
+  mc-server:
+    image: itzg/minecraft-server:latest
+    container_name: tailcraft-mc-local
+    ports:
+      - "25565:25565" # Minecraft game port
+      - "25575:25575" # RCON management port
+    environment:
+      EULA: "TRUE"
+      TYPE: "PAPER"   # Lightweight, optimized server engine
+      VERSION: "LATEST" # Automatically fetches the latest version
+      MEMORY: "2G"
+      ENABLE_RCON: "true" # RCON needs to be enabled for remote command execution
+      RCON_PASSWORD: "${RCON_PASSWORD}"
+      RCON_PORT: 25575
+    volumes:
+      - ./data:/data # Mounts server files locally
+    restart: unless-stopped
