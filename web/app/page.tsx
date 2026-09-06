@@ -1,5 +1,6 @@
 import ServerControl from '@/components/ServerControl';
 import RconConsole from '@/components/RconConsole';
+import DockerLogs from '@/components/DockerLogs';
 
 export default function Home() {
   return (
@@ -14,6 +15,7 @@ export default function Home() {
       <div className="w-full max-w-2xl flex flex-col items-center">
         <ServerControl />
         <RconConsole />
+        <DockerLogs />
       </div>
     </main>
   );
