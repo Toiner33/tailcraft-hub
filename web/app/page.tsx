@@ -2,6 +2,7 @@ import ServerControl from '@/components/ServerControl';
 import RconConsole from '@/components/RconConsole';
 import DockerLogs from '@/components/DockerLogs';
 import ResourceMetrics from '@/components/ResourceMetrics';
+import ServerPropertiesEditor from '@/components/ServerPropertiesEditor';
 
 export default function Home() {
   return (
@@ -13,10 +14,10 @@ export default function Home() {
         <p className="text-zinc-400">Local Minecraft Server Manager</p>
       </div>
 
-      {/* Expanded container width to 5xl with generous vertical gap */}
       <div className="w-full max-w-5xl flex flex-col items-center space-y-6">
         <ResourceMetrics />
         <ServerControl />
+        <ServerPropertiesEditor />
         <RconConsole />
         <DockerLogs />
       </div>
