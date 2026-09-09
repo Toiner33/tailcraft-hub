@@ -3,6 +3,7 @@ import RconConsole from '@/components/RconConsole';
 import DockerLogs from '@/components/DockerLogs';
 import ResourceMetrics from '@/components/ResourceMetrics';
 import ServerPropertiesEditor from '@/components/ServerPropertiesEditor';
+import BackupManager from '@/components/BackupManager';
 
 export default function Home() {
   return (
@@ -18,6 +19,7 @@ export default function Home() {
         <ResourceMetrics />
         <ServerControl />
         <ServerPropertiesEditor />
+        <BackupManager />
         <RconConsole />
         <DockerLogs />
       </div>
