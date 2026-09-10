@@ -54,7 +54,18 @@ export default function BackupManager() {
     fetchServerStatus();
 
     const interval = setInterval(fetchServerStatus, 3000);
-    return () => clearInterval(interval);
+
+    // Listener for cross-component updates (e.g. World Reset)
+    const handleBackupUpdate = () => {
+      fetchBackups();
+    };
+
+    window.addEventListener('backupListUpdated', handleBackupUpdate);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('backupListUpdated', handleBackupUpdate);
+    };
   }, []);
 
   const handleCreateBackup = async () => {

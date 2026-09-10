@@ -4,6 +4,7 @@ import DockerLogs from '@/components/DockerLogs';
 import ResourceMetrics from '@/components/ResourceMetrics';
 import ServerPropertiesEditor from '@/components/ServerPropertiesEditor';
 import BackupManager from '@/components/BackupManager';
+import WorldReset from '@/components/WorldReset';
 
 export default function Home() {
   return (
@@ -20,6 +21,7 @@ export default function Home() {
         <ServerControl />
         <ServerPropertiesEditor />
         <BackupManager />
+        <WorldReset />
         <RconConsole />
         <DockerLogs />
       </div>

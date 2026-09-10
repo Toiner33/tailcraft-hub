@@ -8,17 +8,6 @@ const CONTAINER_NAME = process.env.DOCKER_CONTAINER_NAME || 'tailcraft-mc-local'
 const WORLD_PATH = path.resolve(process.cwd(), '../data/world');
 const BACKUPS_DIR = path.resolve(process.cwd(), '../data/backups');
 
-const BYTES_PER_KB = 1024;
-const BYTES_PER_MB = BYTES_PER_KB * 1024;
-const BYTES_PER_GB = BYTES_PER_MB * 1024;
-
-function formatBytes(bytes: number): string {
-  if (bytes >= BYTES_PER_GB) return `${(bytes / BYTES_PER_GB).toFixed(2)} GB`;
-  if (bytes >= BYTES_PER_MB) return `${(bytes / BYTES_PER_MB).toFixed(2)} MB`;
-  if (bytes >= BYTES_PER_KB) return `${(bytes / BYTES_PER_KB).toFixed(2)} KB`;
-  return `${bytes} B`;
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -85,6 +74,13 @@ export async function POST(request: NextRequest) {
       file: targetBackupPath,
       cwd: path.dirname(WORLD_PATH),
     });
+
+    // Ensure UID 1000 ownership after extraction
+    try {
+      await fs.chown(WORLD_PATH, 1000, 1000);
+    } catch {
+      // Ignore on non-POSIX or unprivileged environments
+    }
 
     // 6. Step 3: Auto-Delete the Restored Target Backup
     await fs.unlink(targetBackupPath);

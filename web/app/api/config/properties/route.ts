@@ -26,7 +26,10 @@ function parseProperties(content: string): Record<string, string> {
     const separatorIndex = trimmed.indexOf('=');
     if (separatorIndex !== SEPARATOR_NOT_FOUND) {
       const key = trimmed.substring(0, separatorIndex).trim();
-      const value = trimmed.substring(separatorIndex + 1).trim();
+      let value = trimmed.substring(separatorIndex + 1).trim();
+
+      // Clean survived backslashes before colons (e.g. minecraft\:normal -> minecraft:normal)
+      value = value.replace(/\\:/g, ':');
       properties[key] = value;
     }
   }
@@ -41,7 +44,9 @@ function serializeProperties(properties: Record<string, string>): string {
 
   let output = `# Minecraft server properties\n# Managed by TailCraft Hub\n`;
   for (const [key, value] of Object.entries(safeProperties)) {
-    output += `${key}=${value}\n`;
+    // Sanitize any backslashes before writing
+    const cleanValue = String(value).replace(/\\:/g, ':');
+    output += `${key}=${cleanValue}\n`;
   }
   return output;
 }

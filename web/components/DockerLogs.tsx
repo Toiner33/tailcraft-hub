@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 export default function DockerLogs() {
   const [logLines, setLogLines] = useState<string[]>([]);
   const [lineCount, setLineCount] = useState<number>(200);
+  const [currentStartTimestamp, setCurrentStartTimestamp] = useState<string | null>(null);
   const logContainerRef = useRef<HTMLDivElement | null>(null);
   const isUserScrollingRef = useRef<boolean>(false);
 
@@ -13,14 +14,20 @@ export default function DockerLogs() {
     try {
       const res = await fetch(`/api/docker/logs?lines=${lineCount}`);
       const data = await res.json();
+
       if (data.success && typeof data.logs === 'string') {
-        // Split raw logs cleanly into individual lines
+        // Detect container restart -> Reset log state instantly
+        if (data.startedAt && data.startedAt !== currentStartTimestamp) {
+          setCurrentStartTimestamp(data.startedAt);
+          setLogLines([]);
+        }
+
         const lines = data.logs
           .split(/\r?\n/)
           .filter((line: string) => line.trim().length > 0);
         setLogLines(lines);
       }
-    } catch (err) {
+    } catch {
       setLogLines(['[ERROR] Failed to fetch Docker logs.']);
     }
   };
@@ -29,7 +36,7 @@ export default function DockerLogs() {
     fetchLogs();
     const interval = setInterval(fetchLogs, 3000);
     return () => clearInterval(interval);
-  }, [lineCount]);
+  }, [lineCount, currentStartTimestamp]);
 
   useEffect(() => {
     const el = logContainerRef.current;
@@ -45,7 +52,6 @@ export default function DockerLogs() {
     isUserScrollingRef.current = !isAtBottom;
   };
 
-  // Helper to apply log level styling
   const getLineStyle = (line: string) => {
     const upper = line.toUpperCase();
     if (upper.includes('/WARN') || upper.includes('WARNING')) {
@@ -91,7 +97,7 @@ export default function DockerLogs() {
           className="h-80 overflow-y-auto bg-black/90 rounded-md p-4 font-mono text-xs border border-zinc-800 space-y-1 select-text"
         >
           {logLines.length === 0 ? (
-            <div className="text-zinc-500 italic">No log outputs recorded yet...</div>
+            <div className="text-zinc-500 italic">No log outputs recorded for current session...</div>
           ) : (
             logLines.map((line, index) => (
               <div key={index} className={`leading-relaxed break-words ${getLineStyle(line)}`}>
