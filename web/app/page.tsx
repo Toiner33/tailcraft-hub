@@ -5,6 +5,7 @@ import ResourceMetrics from '@/components/ResourceMetrics';
 import ServerPropertiesEditor from '@/components/ServerPropertiesEditor';
 import BackupManager from '@/components/BackupManager';
 import WorldReset from '@/components/WorldReset';
+import DimensionAnalytics from '@/components/DimensionAnalytics';
 
 export default function Home() {
   return (
@@ -22,6 +23,7 @@ export default function Home() {
         <ServerPropertiesEditor />
         <BackupManager />
         <WorldReset />
+        <DimensionAnalytics />
         <RconConsole />
         <DockerLogs />
       </div>
