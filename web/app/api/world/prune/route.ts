@@ -4,6 +4,9 @@ import path from 'path';
 import { sendRconCommand } from '@/lib/rcon';
 import { getDimensionSubPath, isValidDimensionId } from '@/types/dimensions';
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const PRUNE_ALL_THRESHOLD = 0;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -39,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     const mcaFiles = files.filter((f) => f.endsWith('.mca'));
     const now = Date.now();
-    const thresholdMs = (daysOlderThan || 0) * 24 * 60 * 60 * 1000;
+    const thresholdMs = (daysOlderThan || PRUNE_ALL_THRESHOLD) * MS_PER_DAY;
 
     let prunedCount = 0;
     let freedBytes = 0;
@@ -49,7 +52,7 @@ export async function POST(request: NextRequest) {
       const stat = await fs.stat(filePath);
 
       const ageMs = now - stat.mtimeMs;
-      if (daysOlderThan === 0 || ageMs >= thresholdMs) {
+      if (daysOlderThan === PRUNE_ALL_THRESHOLD || ageMs >= thresholdMs) {
         freedBytes += stat.size;
         await fs.unlink(filePath);
         prunedCount++;

@@ -6,6 +6,7 @@ import ServerPropertiesEditor from '@/components/ServerPropertiesEditor';
 import BackupManager from '@/components/BackupManager';
 import WorldReset from '@/components/WorldReset';
 import DimensionAnalytics from '@/components/DimensionAnalytics';
+import GameRulesPanel from '@/components/GameRulesPanel';
 
 export default function Home() {
   return (
@@ -24,6 +25,7 @@ export default function Home() {
         <BackupManager />
         <WorldReset />
         <DimensionAnalytics />
+        <GameRulesPanel />
         <RconConsole />
         <DockerLogs />
       </div>
