@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendRconCommand, sendRconBatch } from '@/lib/rcon';
+import { sendRconBatch, sendRconCommand } from '@/lib/rcon';
 import { GAMERULES } from '@/types/gamerules';
+import { readGameruleConfig, saveGameruleConfig } from '@/lib/gameruleConfig';
 
 function parseValue(response: string, type: 'boolean' | 'integer'): boolean | number | null {
   if (!response) return null;
@@ -21,10 +22,11 @@ function parseValue(response: string, type: 'boolean' | 'integer'): boolean | nu
 
 export async function GET() {
   const results: Record<string, boolean | number> = {};
+  const savedConfig = await readGameruleConfig();
   let isLive = false;
 
   try {
-    // Send ALL 23 rule queries down a SINGLE RCON TCP connection
+    // Attempt live RCON status fetch
     const commands = GAMERULES.map((rule) => `gamerule ${rule.name}`);
     const rawResponses = await sendRconBatch(commands);
     isLive = true;
@@ -32,13 +34,16 @@ export async function GET() {
     GAMERULES.forEach((rule, index) => {
       const resp = rawResponses[index] || '';
       const parsed = parseValue(resp, rule.type);
-      results[rule.name] = parsed !== null ? parsed : rule.defaultValue;
+      const cleanName = rule.name.replace('minecraft:', '');
+
+      results[rule.name] = parsed ?? savedConfig[cleanName] ?? rule.defaultValue;
     });
-  } catch (error) {
-    console.error('RCON fetch failed:', error);
+  } catch {
+    // Fallback: Read from local JSON config when offline
     isLive = false;
     for (const rule of GAMERULES) {
-      results[rule.name] = rule.defaultValue;
+      const cleanName = rule.name.replace('minecraft:', '');
+      results[rule.name] = savedConfig[cleanName] ?? rule.defaultValue;
     }
   }
 
@@ -46,6 +51,7 @@ export async function GET() {
     success: true,
     isLive,
     gamerules: results,
+    warning: isLive ? null : 'Server offline. Reading/editing local JSON configuration.',
   });
 }
 
@@ -53,12 +59,26 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { ruleName, value } = body;
+    const cleanName = ruleName.replace('minecraft:', '');
 
-    const rconResponse = await sendRconCommand(`gamerule ${ruleName} ${value}`);
+    // 1. Always update local JSON as single source of truth
+    await saveGameruleConfig(cleanName, value);
+
+    let rconResponse = 'Saved to local JSON configuration.';
+    let isLive = false;
+
+    // 2. If server is online, push live update via RCON
+    try {
+      rconResponse = await sendRconCommand(`gamerule ${cleanName} ${value}`);
+      isLive = true;
+    } catch {
+      isLive = false;
+    }
 
     return NextResponse.json({
       success: true,
-      ruleName,
+      isLive,
+      ruleName: cleanName,
       value,
       rconResponse,
     });

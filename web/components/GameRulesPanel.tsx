@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GAMERULES, GAMERULE_CATEGORIES } from '@/types/gamerules';
 
@@ -15,6 +15,9 @@ export default function GamerulesPanel() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
+  // Track active input focus to prevent background refreshes from disrupting typing
+  const isUpdatingRef = useRef<boolean>(false);
+
   /**
    * Helper to look up a rule's value by checking both raw key and clean key.
    */
@@ -25,29 +28,65 @@ export default function GamerulesPanel() {
     return defaultValue;
   };
 
-  const fetchGamerules = async () => {
+  /**
+   * Fetches gamerules and live state from the API.
+   * @param isBackground If true, skips setting the global full-card loading spinner.
+   */
+  const fetchGamerules = async (isBackground = false) => {
+    if (isUpdatingRef.current) return; // Skip background fetch while a user POST update is in flight
+
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
+
       const res = await fetch('/api/world/gamerules');
       const data = await res.json();
+
       if (data.success) {
         setValues(data.gamerules || {});
         setIsLive(data.isLive);
         setWarning(data.warning || null);
       }
     } catch {
-      setStatusMsg('Failed to fetch gamerules.');
+      if (!isBackground) {
+        setStatusMsg('Failed to fetch gamerules.');
+      }
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
+  // Initial fetch + Docker container status check
   useEffect(() => {
-    fetchGamerules();
+    // 1. Initial load of gamerules
+    fetchGamerules(false);
+
+    // 2. Poll Docker container status every 5s without calling RCON
+    const interval = setInterval(async () => {
+      if (isUpdatingRef.current) return;
+
+      try {
+        const res = await fetch('/api/docker/status');
+        const data = await res.json();
+        const isRunning = Boolean(data.running);
+
+        setIsLive((prevLive) => {
+          // If container status changed from offline -> running, fetch fresh live values
+          if (!prevLive && isRunning) {
+            fetchGamerules(true);
+          }
+          return isRunning;
+        });
+      } catch {
+        setIsLive(false);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleUpdate = async (ruleName: string, newValue: boolean | number) => {
     const cleanName = ruleName.replace('minecraft:', '');
+    isUpdatingRef.current = true;
 
     // 1. Optimistic UI update so the user sees immediate change
     setValues((prev) => ({
@@ -78,11 +117,13 @@ export default function GamerulesPanel() {
       } else {
         // Revert optimistic update only when the API explicitly fails to write
         setStatusMsg(data.error || `Failed to update ${cleanName}`);
-        fetchGamerules(); 
+        fetchGamerules(true); 
       }
     } catch {
       setStatusMsg(`Network error updating ${cleanName}`);
-      fetchGamerules();
+      fetchGamerules(true);
+    } finally {
+      isUpdatingRef.current = false;
     }
   };
 
@@ -122,7 +163,7 @@ export default function GamerulesPanel() {
             Interactive Gamerules Panel
           </CardTitle>
           <span
-            className={`text-xs px-2 py-0.5 rounded font-mono ${
+            className={`text-xs px-2 py-0.5 rounded font-mono transition-colors ${
               isLive
                 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
                 : 'bg-amber-950 text-amber-400 border border-amber-800'

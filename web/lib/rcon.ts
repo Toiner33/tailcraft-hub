@@ -35,3 +35,20 @@ export async function sendRconCommand(command: string): Promise<string> {
   const [res] = await sendRconBatch([command]);
   return res;
 }
+
+/**
+ * Polls RCON until connected or times out.
+ * Default: 60 retries @ 2.5s delay = 150 seconds (2.5 minutes) total window.
+ */
+export async function waitForRcon(maxRetries = 60, delayMs = 2500): Promise<boolean> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      // Light command to test connectivity
+      await sendRconCommand('seed');
+      return true;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  return false;
+}
