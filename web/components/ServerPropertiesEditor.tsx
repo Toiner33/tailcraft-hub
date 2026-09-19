@@ -146,7 +146,7 @@ export default function ServerPropertiesEditor() {
             type="number"
             value={value}
             onChange={(e) => handleChange(key, e.target.value)}
-            className="w-24 min-w-[5rem] bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-xs text-center text-zinc-100 font-mono focus:outline-none focus:border-emerald-500"
+            className="w-24 min-w-20 bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-xs text-center text-zinc-100 font-mono focus:outline-none focus:border-emerald-500"
           />
           <button
             type="button"
