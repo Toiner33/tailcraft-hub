@@ -13,15 +13,19 @@ interface ServerStatus {
   name?: string;
 }
 
-export default function ServerControl() {
+interface ServerControlProps {
+  serverId: string; // Accept serverId as a prop
+}
+
+export default function ServerControl({ serverId }: ServerControlProps) {
   const [statusData, setStatusData] = useState<ServerStatus | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionPending, setActionPending] = useState<boolean>(false);
 
-  // Function to poll backend status API
+  // Function to poll backend status API for this specific server
   const fetchStatus = async () => {
     try {
-      const res = await fetch('/api/docker/status');
+      const res = await fetch(`/api/servers/${serverId}/docker`);
       const data = await res.json();
       setStatusData(data);
     } catch (err) {
@@ -31,18 +35,18 @@ export default function ServerControl() {
     }
   };
 
-  // Poll status every 5 seconds
+  // Poll status every 5 seconds, re-running if serverId changes
   useEffect(() => {
     fetchStatus();
     const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [serverId]);
 
-  // Function to trigger Start/Stop/Restart actions
+  // Function to trigger Start/Stop/Restart actions for this specific server
   const handleAction = async (action: 'start' | 'stop' | 'restart') => {
     setActionPending(true);
     try {
-      await fetch('/api/docker/action', {
+      await fetch(`/api/servers/${serverId}/docker`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),

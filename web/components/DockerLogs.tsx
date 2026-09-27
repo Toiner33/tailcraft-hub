@@ -3,7 +3,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-export default function DockerLogs() {
+interface DockerLogsProps {
+  serverId: string; // Accept serverId as a prop
+}
+
+export default function DockerLogs({ serverId }: DockerLogsProps) {
   const [logLines, setLogLines] = useState<string[]>([]);
   const [lineCount, setLineCount] = useState<number>(200);
   const [currentStartTimestamp, setCurrentStartTimestamp] = useState<string | null>(null);
@@ -12,7 +16,7 @@ export default function DockerLogs() {
 
   const fetchLogs = async () => {
     try {
-      const res = await fetch(`/api/docker/logs?lines=${lineCount}`);
+      const res = await fetch(`/api/servers/${serverId}/docker/logs?lines=${lineCount}`);
       const data = await res.json();
 
       if (data.success && typeof data.logs === 'string') {
@@ -36,7 +40,7 @@ export default function DockerLogs() {
     fetchLogs();
     const interval = setInterval(fetchLogs, 3000);
     return () => clearInterval(interval);
-  }, [lineCount, currentStartTimestamp]);
+  }, [lineCount, currentStartTimestamp, serverId]);
 
   useEffect(() => {
     const el = logContainerRef.current;
@@ -100,7 +104,7 @@ export default function DockerLogs() {
             <div className="text-zinc-500 italic">No log outputs recorded for current session...</div>
           ) : (
             logLines.map((line, index) => (
-              <div key={index} className={`leading-relaxed break-words ${getLineStyle(line)}`}>
+              <div key={index} className={`leading-relaxed wrap-break-word ${getLineStyle(line)}`}>
                 {line}
               </div>
             ))

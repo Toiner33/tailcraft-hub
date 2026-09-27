@@ -6,7 +6,11 @@ import { DIMENSIONS, DimensionStats, DimensionId } from '@/types/dimensions';
 
 type TimeUnit = 'days' | 'months' | 'years';
 
-export default function DimensionAnalytics() {
+interface DimensionAnalyticsProps {
+  serverId: string; // Accept serverId as a prop
+}
+
+export default function DimensionAnalytics({ serverId }: DimensionAnalyticsProps) {
   const [dimensions, setDimensions] = useState<DimensionStats[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [pruningDim, setPruningDim] = useState<string | null>(null);
@@ -24,7 +28,7 @@ export default function DimensionAnalytics() {
   const fetchDimensionStats = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/world/dimensions');
+      const res = await fetch(`/api/servers/${serverId}/world/dimensions`);
       const data = await res.json();
       if (data.success) {
         setDimensions(data.dimensions);
@@ -40,7 +44,7 @@ export default function DimensionAnalytics() {
 
   useEffect(() => {
     fetchDimensionStats();
-  }, []);
+  }, [serverId]);
 
   const handleValueChange = (dimId: DimensionId, delta: number) => {
     setTimeValues((prev) => ({
@@ -79,7 +83,7 @@ export default function DimensionAnalytics() {
       setPruningDim(dimensionId);
       setStatusMessage(`Flushing chunk data and pruning ${dimName}...`);
 
-      const res = await fetch('/api/world/prune', {
+      const res = await fetch(`/api/servers/${serverId}/world/prune`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dimensionId, daysOlderThan: totalDays }),

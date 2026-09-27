@@ -3,7 +3,11 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-export default function WorldReset() {
+interface WorldResetProps {
+  serverId: string; // Accept serverId as a prop
+}
+
+export default function WorldReset({ serverId }: WorldResetProps) {
   const [seed, setSeed] = useState<string>('');
   const [levelType, setLevelType] = useState<string>('minecraft:normal');
   const [difficulty, setDifficulty] = useState<string>('normal');
@@ -16,7 +20,7 @@ export default function WorldReset() {
 
   const fetchServerStatus = async () => {
     try {
-      const res = await fetch('/api/docker/status');
+      const res = await fetch(`/api/servers/${serverId}/docker`);
       const data = await res.json();
       setIsServerRunning(Boolean(data.running));
     } catch {
@@ -28,7 +32,7 @@ export default function WorldReset() {
     fetchServerStatus();
     const interval = setInterval(fetchServerStatus, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [serverId]);
 
   const handleGenerateSeed = () => {
     // Generate a random 64-bit safe numeric seed
@@ -52,7 +56,7 @@ export default function WorldReset() {
       setIsResetting(true);
       setStatusMessage('Creating safety backup and resetting world generation settings...');
 
-      const res = await fetch('/api/world/reset', {
+      const res = await fetch(`/api/servers/${serverId}/world/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

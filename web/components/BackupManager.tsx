@@ -10,7 +10,11 @@ interface BackupFile {
   createdAt: string;
 }
 
-export default function BackupManager() {
+interface BackupManagerProps {
+  serverId: string; // Accept serverId as a prop
+}
+
+export default function BackupManager({ serverId }: BackupManagerProps) {
   const [backups, setBackups] = useState<BackupFile[]>([]);
   const [formattedTotalSize, setFormattedTotalSize] = useState<string>('0 B');
   const [isServerRunning, setIsServerRunning] = useState<boolean>(false);
@@ -22,7 +26,7 @@ export default function BackupManager() {
 
   const fetchServerStatus = async () => {
     try {
-      const res = await fetch('/api/docker/status');
+      const res = await fetch(`/api/servers/${serverId}/docker`);
       const data = await res.json();
       // Directly assign the boolean 'running' property from your API
       setIsServerRunning(Boolean(data.running));
@@ -34,7 +38,7 @@ export default function BackupManager() {
   const fetchBackups = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/backups');
+      const res = await fetch(`/api/servers/${serverId}/backups`);
       const data = await res.json();
       if (data.success) {
         setBackups(data.backups);
@@ -66,13 +70,13 @@ export default function BackupManager() {
       clearInterval(interval);
       window.removeEventListener('backupListUpdated', handleBackupUpdate);
     };
-  }, []);
+  }, [serverId]);
 
   const handleCreateBackup = async () => {
     try {
       setCreating(true);
       setStatusMessage('Compressing world folder into backup...');
-      const res = await fetch('/api/backups', { method: 'POST' });
+      const res = await fetch(`/api/servers/${serverId}/backups`, { method: 'POST' });
       const data = await res.json();
 
       if (data.success) {
@@ -104,7 +108,7 @@ export default function BackupManager() {
       setRestoringFile(filename);
       setStatusMessage(`Restoring ${filename}... Creating safety snapshot and unpacking...`);
       
-      const res = await fetch('/api/backups/restore', {
+      const res = await fetch(`/api/servers/${serverId}/backups/restore`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename }),
@@ -129,7 +133,7 @@ export default function BackupManager() {
     try {
       setDeletingFile(filename);
       setStatusMessage(`Deleting ${filename}...`);
-      const res = await fetch(`/api/backups?filename=${encodeURIComponent(filename)}`, {
+      const res = await fetch(`/api/servers/${serverId}/backups?filename=${encodeURIComponent(filename)}`, {
         method: 'DELETE',
       });
       const data = await res.json();
@@ -166,7 +170,7 @@ export default function BackupManager() {
             </span>
           </div>
           <p className="text-xs text-zinc-400 mt-1">
-            Manual snapshots saved in <code className="text-emerald-400">data/backups/</code>
+            Manual snapshots saved in <code className="text-emerald-400">data/servers/{serverId}/backups/</code>
           </p>
         </div>
         <button
@@ -188,7 +192,7 @@ export default function BackupManager() {
         <div className="flex flex-col gap-2 max-h-80 overflow-y-auto p-2 border border-zinc-800 rounded bg-black/40">
           {backups.length === 0 ? (
             <p className="text-xs text-zinc-500 py-4 text-center">
-              No backups found. Click "Create World Backup" above to make your first snapshot.
+              No backups found. Click &quot;Create World Backup&quot; above to make your first snapshot.
             </p>
           ) : (
             backups.map((backup) => (

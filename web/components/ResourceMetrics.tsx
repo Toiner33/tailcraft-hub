@@ -26,12 +26,17 @@ interface MetricsData {
   };
 }
 
-export default function ResourceMetrics() {
+interface ResourceMetricsProps {
+  serverId: string; // Accept serverId as a prop
+}
+
+export default function ResourceMetrics({ serverId }: ResourceMetricsProps) {
   const [metrics, setMetrics] = useState<MetricsData | null>(null);
 
   const fetchMetrics = async () => {
     try {
-      const res = await fetch('/api/metrics');
+      // Updated to target the multi-tenant serverId API route
+      const res = await fetch(`/api/servers/${serverId}/metrics`);
       const data = await res.json();
       if (data.success) {
         setMetrics(data.metrics);
@@ -45,7 +50,7 @@ export default function ResourceMetrics() {
     fetchMetrics();
     const interval = setInterval(fetchMetrics, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [serverId]);
 
   return (
     <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6 my-8">

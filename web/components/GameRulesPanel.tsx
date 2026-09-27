@@ -4,7 +4,11 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GAMERULES, GAMERULE_CATEGORIES } from '@/types/gamerules';
 
-export default function GamerulesPanel() {
+interface GamerulesPanelProps {
+  serverId: string; // Accept serverId as a prop
+}
+
+export default function GamerulesPanel({ serverId }: GamerulesPanelProps) {
   const [values, setValues] = useState<Record<string, boolean | number>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [isLive, setIsLive] = useState<boolean>(false);
@@ -38,7 +42,7 @@ export default function GamerulesPanel() {
     try {
       if (!isBackground) setLoading(true);
 
-      const res = await fetch('/api/world/gamerules');
+      const res = await fetch(`/api/servers/${serverId}/world/gamerules`);
       const data = await res.json();
 
       if (data.success) {
@@ -65,7 +69,7 @@ export default function GamerulesPanel() {
       if (isUpdatingRef.current) return;
 
       try {
-        const res = await fetch('/api/docker/status');
+        const res = await fetch(`/api/servers/${serverId}/docker`);
         const data = await res.json();
         const isRunning = Boolean(data.running);
 
@@ -82,7 +86,7 @@ export default function GamerulesPanel() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [serverId]);
 
   const handleUpdate = async (ruleName: string, newValue: boolean | number) => {
     const cleanName = ruleName.replace('minecraft:', '');
@@ -96,7 +100,7 @@ export default function GamerulesPanel() {
     }));
 
     try {
-      const res = await fetch('/api/world/gamerules', {
+      const res = await fetch(`/api/servers/${serverId}/world/gamerules`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ruleName: cleanName, value: newValue }),
@@ -229,7 +233,7 @@ export default function GamerulesPanel() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-125 overflow-y-auto pr-1">
           {filteredRules.length === 0 ? (
             <div className="col-span-2 text-center text-zinc-500 py-8 text-xs italic">
-              No gamerules matching "{searchQuery}" found.
+              No gamerules matching &quot;{searchQuery}&quot; found.
             </div>
           ) : (
             filteredRules.map((rule) => {

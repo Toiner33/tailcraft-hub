@@ -24,7 +24,11 @@ const ENUM_SCHEMAS: Record<string, string[]> = {
   ],
 };
 
-export default function ServerPropertiesEditor() {
+interface ServerPropertiesEditorProps {
+  serverId: string; // Accept serverId as a prop
+}
+
+export default function ServerPropertiesEditor({ serverId }: ServerPropertiesEditorProps) {
   const [properties, setProperties] = useState<Record<string, string>>({});
   const [lockedKeys, setLockedKeys] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -34,7 +38,7 @@ export default function ServerPropertiesEditor() {
   const fetchProperties = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/config/properties');
+      const res = await fetch(`/api/servers/${serverId}/config/properties`);
       const data = await res.json();
       if (data.success) {
         setProperties(data.properties);
@@ -51,7 +55,7 @@ export default function ServerPropertiesEditor() {
 
   useEffect(() => {
     fetchProperties();
-  }, []);
+  }, [serverId]);
 
   const handleChange = (key: string, value: string) => {
     if (lockedKeys.includes(key)) return; // Prevent mutating locked keys
@@ -62,7 +66,7 @@ export default function ServerPropertiesEditor() {
     try {
       setSaving(true);
       setStatusMessage('');
-      const res = await fetch('/api/config/properties', {
+      const res = await fetch(`/api/servers/${serverId}/config/properties`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ properties }),

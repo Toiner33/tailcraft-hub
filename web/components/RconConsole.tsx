@@ -9,7 +9,11 @@ interface LogEntry {
   text: string;
 }
 
-export default function RconConsole() {
+interface RconConsoleProps {
+  serverId: string; // Accept serverId as a prop
+}
+
+export default function RconConsole({ serverId }: RconConsoleProps) {
   const [command, setCommand] = useState('');
   const [logs, setLogs] = useState<LogEntry[]>([
     { type: 'output', text: 'TailCraft RCON Terminal Ready.' },
@@ -28,7 +32,7 @@ export default function RconConsole() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/rcon/command', {
+      const res = await fetch(`/api/servers/${serverId}/rcon/command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ command: currentCmd }),
@@ -44,7 +48,7 @@ export default function RconConsole() {
           { type: 'error', text: `Error: ${data.error}` },
         ]);
       }
-    } catch (err) {
+    } catch {
       setLogs((prev) => [
         ...prev,
         { type: 'error', text: 'Failed to communicate with RCON API.' },
