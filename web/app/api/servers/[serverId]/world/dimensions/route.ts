@@ -2,16 +2,9 @@ import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { DIMENSIONS, DimensionStats } from '@/types/dimensions';
-
-const EMPTY_SIZE = 0;
-
-function formatBytes(bytes: number): string {
-  const BYTES_PER_KIB = 1024;
-  const SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
-  if (bytes === EMPTY_SIZE) return '0 B';
-  const i = Math.floor(Math.log(bytes) / Math.log(BYTES_PER_KIB));
-  return `${parseFloat((bytes / Math.pow(BYTES_PER_KIB, i)).toFixed(2))} ${SIZE_UNITS[i]}`;
-}
+import { APP_CONFIG } from '@/lib/config';
+import { getServerById } from '@/lib/serverRegistry';
+import { formatBytes } from '@/lib/utils';
 
 // Scans binary locations table (first 4096 bytes) of an MCA file to count allocated chunks
 async function countGeneratedChunksInMca(filePath: string): Promise<number> {
@@ -21,35 +14,50 @@ async function countGeneratedChunksInMca(filePath: string): Promise<number> {
     
     const handle = await fs.open(filePath, 'r');
     const headerBuffer = Buffer.alloc(MCA_HEADER_SIZE_BYTES);
-    await handle.read(headerBuffer, EMPTY_SIZE, MCA_HEADER_SIZE_BYTES, EMPTY_SIZE);
+    await handle.read(headerBuffer, 0, MCA_HEADER_SIZE_BYTES, 0);
     await handle.close();
 
-    let count = EMPTY_SIZE;
-    for (let i = EMPTY_SIZE; i < MCA_HEADER_SIZE_BYTES; i += LOCATION_TABLE_ENTRY_SIZE_BYTES) {
+    let count = 0;
+    for (let i = 0; i < MCA_HEADER_SIZE_BYTES; i += LOCATION_TABLE_ENTRY_SIZE_BYTES) {
       const location = headerBuffer.readUInt32BE(i);
-      if (location !== EMPTY_SIZE) count++;
+      if (location !== 0) count++;
     }
     return count;
   } catch {
-    return EMPTY_SIZE;
+    return 0;
   }
 }
 
-export async function GET() {
+export async function GET(
+  request: Request,
+  { params }: { params: { serverId: string } }
+) {
   try {
-    const dataDir = path.resolve(process.cwd(), '../data');
+    const { serverId } = params;
+
+    // Validate that the target server exists.
+    const server = await getServerById(serverId);
+    if (!server) {
+      return NextResponse.json(
+        { success: false, error: `Server with ID ${serverId} not found.` },
+        { status: 404 }
+      );
+    }
+
+    const dataDir = path.join(APP_CONFIG.serversRootDir, server.id);
     const results: DimensionStats[] = [];
+    const CHUNKS_EXTENSION = '.mca';
 
     for (const dim of DIMENSIONS) {
       const regionDir = path.join(dataDir, dim.subPath);
-      let fileCount = EMPTY_SIZE;
-      let totalSizeBytes = EMPTY_SIZE;
-      let chunkCount = EMPTY_SIZE;
-      let latestMtime = EMPTY_SIZE;
+      let fileCount = 0;
+      let totalSizeBytes = 0;
+      let chunkCount = 0;
+      let latestMtime = 0;
 
       try {
         const files = await fs.readdir(regionDir);
-        const mcaFiles = files.filter((f) => f.endsWith('.mca'));
+        const mcaFiles = files.filter((f) => f.endsWith(CHUNKS_EXTENSION));
         fileCount = mcaFiles.length;
 
         for (const file of mcaFiles) {
@@ -76,7 +84,7 @@ export async function GET() {
         totalSizeBytes,
         formattedSize: formatBytes(totalSizeBytes),
         chunkCount,
-        lastModified: latestMtime > EMPTY_SIZE ? new Date(latestMtime).toISOString() : null,
+        lastModified: latestMtime > 0 ? new Date(latestMtime).toISOString() : null,
       });
     }
 

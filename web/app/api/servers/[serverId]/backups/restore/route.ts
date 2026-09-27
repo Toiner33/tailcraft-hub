@@ -2,14 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import * as tar from 'tar';
-import docker from '@/lib/docker';
+import { getContainerByServerId } from '@/lib/docker';
+import { APP_CONFIG } from '@/lib/config';
+import { getServerById } from '@/lib/serverRegistry';
 
-const CONTAINER_NAME = process.env.DOCKER_CONTAINER_NAME || 'tailcraft-mc-local';
-const WORLD_PATH = path.resolve(process.cwd(), '../data/world');
-const BACKUPS_DIR = path.resolve(process.cwd(), '../data/backups');
+const BACKUP_EXTENSION = '.tar.gz';
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { serverId: string } }
+) {
   try {
+    const { serverId } = params;
+
+    // Validate that the target server directory exists.
+    const server = await getServerById(serverId);
+    if (!server) {
+      return NextResponse.json(
+        { success: false, error: `Server with ID ${serverId} not found.` },
+        { status: 404 }
+      );
+    }
+
+    // Validate request body
     const body = await request.json();
     const { filename } = body;
 
@@ -17,9 +32,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Filename parameter is required.' }, { status: 400 });
     }
 
-    // 1. Safety Guard: Verify server container is stopped
+    // Validate server container status to ensure it's not running before restoring a backup
     try {
-      const container = docker.getContainer(CONTAINER_NAME);
+      const container = await getContainerByServerId(server.id);
       const data = await container.inspect();
       if (data.State.Running) {
         return NextResponse.json(
@@ -31,9 +46,12 @@ export async function POST(request: NextRequest) {
       // Container not running or not found; safe to proceed
     }
 
-    // 2. Target Backup Verification
+    // Target Backup Verification
     const safeFilename = path.basename(filename);
-    const targetBackupPath = path.join(BACKUPS_DIR, safeFilename);
+    const serverBackupsDir = path.join(APP_CONFIG.serversRootDir, serverId, APP_CONFIG.backupsDir); 
+    // No need to ensure directory exists, not being able to removes something doesn't exist is OK.
+    const targetBackupPath = path.join(serverBackupsDir, safeFilename);
+    
 
     try {
       await fs.access(targetBackupPath);
@@ -41,48 +59,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Target backup file not found.' }, { status: 404 });
     }
 
-    // 3. Step 1: Create Safety Snapshot of Current World State
+    // Create Safety Snapshot of Current World State to allow rollback in case of issues during restore
     let safetyBackupName = '';
+    const serverWorldDir = path.join(APP_CONFIG.serversRootDir, serverId, APP_CONFIG.worldDir);
+
     try {
-      await fs.access(WORLD_PATH);
+      await fs.access(serverWorldDir);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      safetyBackupName = `pre-restore-safety-${timestamp}.tar.gz`;
-      const safetyBackupPath = path.join(BACKUPS_DIR, safetyBackupName);
+      safetyBackupName = `pre-restore-safety-${timestamp}${BACKUP_EXTENSION}`;
+      const safetyBackupPath = path.join(serverBackupsDir, safetyBackupName);
 
       await tar.c(
         {
           gzip: true,
           file: safetyBackupPath,
-          cwd: path.dirname(WORLD_PATH),
+          cwd: path.dirname(serverWorldDir),
         },
-        ['world']
+        [APP_CONFIG.worldDir]
       );
     } catch {
       // Current live world directory did not exist; skip safety backup creation
     }
 
-    // 4. Wipe current live world
+    // Wipe current live world
     try {
-      await fs.rm(WORLD_PATH, { recursive: true, force: true });
+      await fs.rm(serverWorldDir, { recursive: true, force: true });
     } catch {
       // Directory was already clean
     }
-    await fs.mkdir(WORLD_PATH, { recursive: true });
+    await fs.mkdir(serverWorldDir, { recursive: true });
 
-    // 5. Step 2: Restore the Target Backup
+    // Restore the Target Backup
     await tar.x({
       file: targetBackupPath,
-      cwd: path.dirname(WORLD_PATH),
+      cwd: path.dirname(serverWorldDir),
     });
 
     // Ensure UID 1000 ownership after extraction
+    const STANDARD_USER_UID = 1000;
     try {
-      await fs.chown(WORLD_PATH, 1000, 1000);
+      await fs.chown(serverWorldDir, STANDARD_USER_UID, STANDARD_USER_UID);
     } catch {
       // Ignore on non-POSIX or unprivileged environments
     }
 
-    // 6. Step 3: Auto-Delete the Restored Target Backup
+    // Auto-Delete the Restored Target Backup we don't need this since is already restored.
     await fs.unlink(targetBackupPath);
 
     return NextResponse.json({

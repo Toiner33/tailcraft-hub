@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
-import docker from '@/lib/docker';
+import { getContainerByServerId } from '@/lib/docker';
 
-export async function GET() {
+export async function GET(
+  request: Request,
+  { params }: { params: { serverId: string } }
+) {
   try {
-    const containerName = process.env.DOCKER_CONTAINER_NAME || 'tailcraft-mc-local';
-    const container = docker.getContainer(containerName);
+    const container = await getContainerByServerId(params.serverId);
 
     // Fetch container details
     const data = await container.inspect();

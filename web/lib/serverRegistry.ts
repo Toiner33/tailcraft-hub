@@ -1,0 +1,151 @@
+import fs from 'fs/promises';
+import path from 'path';
+import crypto from 'crypto';
+import { ServerProfile, CreateServerInput } from '@/types/server';
+import { APP_CONFIG } from '@/lib/config';
+import { resolveRconHost } from '@/lib/rcon';
+
+const FILE_ENCODING = 'utf-8';
+
+async function ensureDirectory(dirPath: string): Promise<void> {
+  await fs.mkdir(dirPath, { recursive: true });
+}
+
+export async function getServers(): Promise<ServerProfile[]> {
+  try {
+    const data = await fs.readFile(APP_CONFIG.serversFile, FILE_ENCODING);
+    return JSON.parse(data);
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      return [];
+    }
+    throw new Error(`Failed to read server configuration: ${error.message}`);
+  }
+}
+
+export async function saveServers(servers: ServerProfile[]): Promise<void> {
+  await ensureDirectory(APP_CONFIG.configsDir);
+  await fs.writeFile(APP_CONFIG.serversFile, JSON.stringify(servers, null, 2), FILE_ENCODING);
+}
+
+export async function getServerById(id: string): Promise<ServerProfile | undefined> {
+  const servers = await getServers();
+  return servers.find((s) => s.id === id);
+}
+
+function resolvePorts(
+  input: { gamePort?: number; rconPort?: number },
+  existingServers: ServerProfile[]
+): { gamePort: number; rconPort: number } {
+  const usedPorts = new Set(
+    existingServers.flatMap((s) => [s.gamePort, s.rcon.port])
+  );
+
+  let gamePort: number;
+  if (input.gamePort) {
+    if (usedPorts.has(input.gamePort)) {
+      throw new Error(`Port ${input.gamePort} is already in use by another server.`);
+    }
+    gamePort = input.gamePort;
+  } else {
+    gamePort = APP_CONFIG.defaults.gamePort;
+    while (usedPorts.has(gamePort)) {
+      gamePort++;
+    }
+  }
+  usedPorts.add(gamePort);
+
+  let rconPort: number;
+  if (input.rconPort) {
+    if (usedPorts.has(input.rconPort)) {
+      throw new Error(`RCON Port ${input.rconPort} is already in use by another server.`);
+    }
+    rconPort = input.rconPort;
+  } else {
+    rconPort = APP_CONFIG.defaults.rconPort;
+    while (usedPorts.has(rconPort)) {
+      rconPort++;
+    }
+  }
+
+  return { gamePort, rconPort };
+}
+
+export async function createServer(input: Partial<CreateServerInput>): Promise<ServerProfile> {
+  const servers = await getServers();
+
+  const id = `srv-${crypto.randomBytes(4).toString('hex')}`;
+  const serverDir = path.join(APP_CONFIG.serversRootDir, id);
+
+  const { gamePort, rconPort } = resolvePorts(
+    { gamePort: input.gamePort, rconPort: input.rconPort },
+    servers
+  );
+
+  const engine = input.engine || APP_CONFIG.defaults.engine;
+  const now = new Date().toISOString();
+
+  const newServer: ServerProfile = {
+    id,
+    name: input.name?.trim() || id,
+    engine,
+    version: input.version || APP_CONFIG.defaults.version,
+    memoryMB: input.memoryMB || APP_CONFIG.defaults.memoryMB,
+    gamePort,
+    rcon: {
+      host: resolveRconHost(process.env.RCON_HOST),
+      port: rconPort,
+      password: input.rconPassword || crypto.randomBytes(8).toString('hex'),
+      timeoutMs: 5000,
+    },
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await ensureDirectory(serverDir);
+  servers.push(newServer);
+  await saveServers(servers);
+
+  return newServer;
+}
+
+export async function updateServer(
+  id: string,
+  updates: Partial<ServerProfile>
+): Promise<ServerProfile> {
+  const servers = await getServers();
+  const index = servers.findIndex((s) => s.id === id);
+
+  if (index === -1) {
+    throw new Error(`Server with ID "${id}" not found.`);
+  }
+
+  const updatedServer: ServerProfile = {
+    ...servers[index],
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+
+  servers[index] = updatedServer;
+  await saveServers(servers);
+
+  return updatedServer;
+}
+
+export async function deleteServer(id: string): Promise<void> {
+  const servers = await getServers();
+  const filtered = servers.filter((s) => s.id !== id);
+
+  if (servers.length === filtered.length) {
+    throw new Error(`Server with ID "${id}" does not exist.`);
+  }
+
+  await saveServers(filtered);
+
+  const serverDir = path.join(APP_CONFIG.serversRootDir, id);
+  try {
+    await fs.rm(serverDir, { recursive: true, force: true });
+  } catch (err) {
+    console.warn(`Warning: Failed to delete working directory for server ${id}:`, err);
+  }
+}

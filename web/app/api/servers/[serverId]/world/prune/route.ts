@@ -3,12 +3,30 @@ import fs from 'fs/promises';
 import path from 'path';
 import { sendRconCommand } from '@/lib/rcon';
 import { getDimensionSubPath, isValidDimensionId } from '@/types/dimensions';
+import { getServerById } from '@/lib/serverRegistry';
+import { APP_CONFIG } from '@/lib/config';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const PRUNE_ALL_THRESHOLD = 0;
+const CHUNKS_EXTENSION = '.mca';
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { serverId: string } }
+) {
   try {
+    const { serverId } = params;
+
+    // Validate the existence of the target server.
+    const server = await getServerById(serverId);
+    if (!server) {
+      return NextResponse.json(
+        { success: false, error: `Server with ID ${serverId} not found.` },
+        { status: 404 }
+      );
+    }
+
+    // Validate the request body.
     const body = await request.json();
     const { dimensionId, daysOlderThan } = body;
 
@@ -27,12 +45,12 @@ export async function POST(request: NextRequest) {
 
     // Flush live server data via RCON
     try {
-      await sendRconCommand('save-all flush');
+      await sendRconCommand(server.rcon, 'save-all flush');
     } catch {
       // Server may be offline; safe to proceed
     }
 
-    const regionDir = path.resolve(process.cwd(), '../data', targetSubPath);
+    const regionDir = path.join(APP_CONFIG.serversRootDir, server.id, targetSubPath);
     let files: string[] = [];
     try {
       files = await fs.readdir(regionDir);
@@ -40,7 +58,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Dimension folder does not exist' }, { status: 404 });
     }
 
-    const mcaFiles = files.filter((f) => f.endsWith('.mca'));
+    const mcaFiles = files.filter((f) => f.endsWith(CHUNKS_EXTENSION));
     const now = Date.now();
     const thresholdMs = (daysOlderThan || PRUNE_ALL_THRESHOLD) * MS_PER_DAY;
 

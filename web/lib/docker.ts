@@ -7,4 +7,11 @@ const docker = new Docker({
     : '/var/run/docker.sock'
 });
 
+/**
+ * Returns the Docker container instance associated with a given server ID.
+ */
+export async function getContainerByServerId(serverId: string) {
+  return docker.getContainer(serverId);
+}
+
 export default docker;

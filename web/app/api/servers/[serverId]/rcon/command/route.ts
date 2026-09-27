@@ -1,7 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendRconCommand } from '@/lib/rcon';
+import { getServerById } from '@/lib/serverRegistry';
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { serverId: string } }
+) {
+  const { serverId } = params;
+
+  // Validate that the target server directory exists.
+  const server = await getServerById(serverId);
+    if (!server) {
+      return NextResponse.json(
+        { success: false, error: `Server with ID ${serverId} not found.` },
+        { status: 404 }
+      );
+    }
+
   try {
     const body = await request.json();
     const { command } = body;
@@ -14,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Execute command on Minecraft server via RCON
-    const response = await sendRconCommand(command);
+    const response = await sendRconCommand(server.rcon, command);
 
     return NextResponse.json({
       success: true,
