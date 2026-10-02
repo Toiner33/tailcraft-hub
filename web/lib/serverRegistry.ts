@@ -71,10 +71,18 @@ function resolvePorts(
   return { gamePort, rconPort };
 }
 
+export function createServerId(){
+  return `srv-${crypto.randomBytes(4).toString('hex')}`;
+}
+
+export function createRconPassword(){
+  return crypto.randomBytes(8).toString('hex');
+}
+
 export async function createServer(input: Partial<CreateServerInput>): Promise<ServerProfile> {
   const servers = await getServers();
 
-  const id = `srv-${crypto.randomBytes(4).toString('hex')}`;
+  const id = createServerId();
   const serverDir = path.join(APP_CONFIG.serversRootDir, id);
 
   const { gamePort, rconPort } = resolvePorts(
@@ -95,7 +103,7 @@ export async function createServer(input: Partial<CreateServerInput>): Promise<S
     rcon: {
       host: resolveRconHost(process.env.RCON_HOST),
       port: rconPort,
-      password: input.rconPassword || crypto.randomBytes(8).toString('hex'),
+      password: input.rconPassword || createRconPassword(),
       timeoutMs: 5000,
     },
     createdAt: now,
@@ -107,6 +115,25 @@ export async function createServer(input: Partial<CreateServerInput>): Promise<S
   await saveServers(servers);
 
   return newServer;
+}
+
+export async function getServerTemplate() {
+  const servers = await getServers();
+  const { gamePort, rconPort } = resolvePorts({}, servers);
+
+  const id = createServerId();
+
+  return {
+    id,
+    name: `Server ${servers.length + 1}`,
+    engine: APP_CONFIG.defaults.engine,
+    version: APP_CONFIG.defaults.version,
+    memoryMB: APP_CONFIG.defaults.memoryMB,
+    gamePort,
+    rconPort,
+    rconPassword: createRconPassword(),
+    rconHost: resolveRconHost(process.env.RCON_HOST),
+  };
 }
 
 export async function updateServer(

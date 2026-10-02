@@ -8,6 +8,15 @@ export type ServerEngine =
   | 'PURPUR' 
   | 'SPIGOT';
 
+export const SERVER_ENGINES: { value: ServerEngine; label: string }[] = [
+  { value: 'PAPER', label: 'Paper' },
+  { value: 'VANILLA', label: 'Vanilla' },
+  { value: 'FABRIC', label: 'Fabric' },
+  { value: 'FORGE', label: 'Forge' },
+  { value: 'PURPUR', label: 'Purpur' },
+  { value: 'SPIGOT', label: 'Spigot' },
+];
+
 export interface ServerProfile {
   id: string;               // Unique ID (e.g., "srv-a1b2c3d")
   name: string;             // Display name

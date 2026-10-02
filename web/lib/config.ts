@@ -26,7 +26,6 @@ export const APP_CONFIG = {
   // Default file name and extension for properties.
   serverProperties: process.env.SERVER_PROPERTIES || 'server.properties',
 
-
   defaults: {
     gamePort: 25565,
     rconPort: 25575,
