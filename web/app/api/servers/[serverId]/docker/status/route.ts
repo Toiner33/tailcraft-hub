@@ -27,7 +27,7 @@ export async function GET(
         status: data.State.Status,
         running: data.State.Running,
         startedAt: data.State.StartedAt,
-        name: data.Name.replace('/', ''),
+        name: `${server.name}: ${data.Name.replace('/', '')}`,
       });
     } catch {
       return NextResponse.json({
@@ -35,6 +35,7 @@ export async function GET(
         exists: false,
         status: 'not created',
         running: false,
+        name: `${server.name}: unknown`,
       });
     }
   } catch (error: unknown) {

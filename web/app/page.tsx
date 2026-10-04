@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ServerProfile, ServerEngine, SERVER_ENGINES } from '@/types/server';
+import { ServerProfile, ServerEngine, SERVER_ENGINES, CreateServerInput } from '@/types/server';
 import { SERVER_DEFAULTS_FALLBACKS } from '@/lib/constants';
 
 // ==========================================
@@ -14,10 +14,12 @@ function ServerGrid({
   loading,
   servers,
   onOpenCreate,
+  onDelete,
 }: {
   loading: boolean;
   servers: ServerProfile[];
   onOpenCreate: () => void;
+  onDelete: (serverId: string) => void;
 }) {
   if (loading) {
     return (
@@ -53,7 +55,7 @@ function ServerGrid({
         >
           <CardHeader className="pb-3">
             <CardTitle className="text-lg font-bold flex items-center justify-between gap-2">
-              <span className="truncate">{server.name}</span>
+              <span className="truncate text-zinc-300">{server.name}</span>
               <span className="text-[10px] bg-zinc-800 text-zinc-300 border border-zinc-700 px-2 py-0.5 rounded font-mono shrink-0">
                 {server.engine}
               </span>
@@ -74,11 +76,22 @@ function ServerGrid({
                 RAM: <span className="text-zinc-200">{server.memoryMB} MB</span>
               </p>
             </div>
-            <Link href={`/servers/${server.id}`} className="block w-full">
-              <Button className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium border border-zinc-700">
-                Manage Server →
+            
+            {/* 2. Button Action Group (Manage + Delete side-by-side) */}
+            <div className="flex gap-2 pt-2">
+              <Link href={`/servers/${server.id}`} className="flex-1">
+                <Button className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium border border-zinc-700">
+                  Manage →
+                </Button>
+              </Link>
+              <Button
+                variant="destructive"
+                className="bg-rose-600 hover:bg-rose-500 text-white text-xs px-3"
+                onClick={() => onDelete(server.id)}
+              >
+                Delete
               </Button>
-            </Link>
+            </div>
           </CardContent>
         </Card>
       ))}
@@ -425,11 +438,11 @@ export default function Home() {
     setSubmitting(true);
 
     try {
-      const payload: any = {
-        name: name.trim() || undefined,
+      const payload: CreateServerInput = {
+        name: name.trim(),
         engine,
-        version: version.trim() || undefined,
-        memoryMB: Number(memoryMB) || undefined,
+        version: version.trim(),
+        memoryMB: Number(memoryMB),
       };
 
       if (showAdvancedPorts) {
@@ -463,6 +476,29 @@ export default function Home() {
     }
   };
 
+  const handleDeleteServer = async (serverId: string) => {
+    if (!window.confirm('Are you sure you want to delete this server profile and its container?')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/servers/${serverId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        // Refresh your server list or redirect
+        await fetchServers();
+      } else {
+        console.error('Failed to delete server:', data.error);
+      }
+    } catch (err) {
+      console.error('Network error while deleting server:', err);
+    }
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-start p-8 bg-zinc-950 text-zinc-100">
       <div className="w-full max-w-5xl mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
@@ -490,6 +526,7 @@ export default function Home() {
           loading={loading}
           servers={servers}
           onOpenCreate={openCreateModal}
+          onDelete={handleDeleteServer}
         />
       </div>
 

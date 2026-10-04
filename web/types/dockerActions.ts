@@ -3,9 +3,10 @@ export const DOCKER_ACTIONS = {
   START: 'start',
   STOP: 'stop',
   RESTART: 'restart',
+  DELETE: 'delete',
 } as const;
 
-// Generates the union type: 'create' | 'start' | 'stop' | 'restart'
+// Generates the union type: 'create' | 'start' | 'stop' | 'restart' | 'delete'
 export type DockerAction = typeof DOCKER_ACTIONS[keyof typeof DOCKER_ACTIONS];
 
 const VALID_DOCKER_ACTIONS: DockerAction[] = [
@@ -13,6 +14,7 @@ const VALID_DOCKER_ACTIONS: DockerAction[] = [
   DOCKER_ACTIONS.START,
   DOCKER_ACTIONS.STOP,
   DOCKER_ACTIONS.RESTART,
+  DOCKER_ACTIONS.DELETE,
 ];
 
 /**

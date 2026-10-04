@@ -4,6 +4,85 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { DOCKER_ACTIONS, DockerAction } from '@/types/dockerActions';
+
+// ==========================================
+// 1. SUB-COMPONENT: ServerActionButtons to handle the correct button rendering based on server state
+// ==========================================
+interface ServerActionButtonsProps {
+  containerExists: boolean;
+  isRunning: boolean;
+  actionPending: boolean;
+  onAction: (action: DockerAction) => void;
+}
+
+function ServerActionButtons({
+  containerExists,
+  isRunning,
+  actionPending,
+  onAction,
+}: ServerActionButtonsProps) {
+  if (!containerExists) {
+    return (
+      <Button
+        className="w-full bg-blue-600 hover:bg-blue-500 text-white"
+        disabled={actionPending}
+        onClick={() => onAction(DOCKER_ACTIONS.CREATE)}
+      >
+        Create Server
+      </Button>
+    );
+  }
+
+  if (!isRunning) {
+    return (
+      <div className="flex gap-2">
+        <Button
+          className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+          disabled={actionPending}
+          onClick={() => onAction(DOCKER_ACTIONS.START)}
+        >
+          Start
+        </Button>
+        <Button
+          variant="destructive"
+          className="flex-1"
+          disabled={actionPending}
+          onClick={() => onAction(DOCKER_ACTIONS.DELETE)}
+        >
+          Delete
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <Button
+        variant="destructive"
+        disabled={actionPending}
+        onClick={() => onAction(DOCKER_ACTIONS.STOP)}
+      >
+        Stop
+      </Button>
+      <Button
+        variant="outline"
+        className="border-zinc-700 hover:bg-zinc-800 text-zinc-100"
+        disabled={actionPending}
+        onClick={() => onAction(DOCKER_ACTIONS.RESTART)}
+      >
+        Restart
+      </Button>
+      <Button
+        variant="destructive"
+        disabled={actionPending}
+        onClick={() => onAction(DOCKER_ACTIONS.DELETE)}
+      >
+        Delete
+      </Button>
+    </div>
+  );
+}
 
 interface ServerStatus {
   success: boolean;
@@ -41,7 +120,11 @@ export default function ServerControl({ serverId }: ServerControlProps) {
     return () => clearInterval(interval);
   }, [serverId]);
 
-  const handleAction = async (action: 'create' | 'start' | 'stop' | 'restart') => {
+  const handleAction = async (action: DockerAction) => {
+    if (action === DOCKER_ACTIONS.DELETE && !window.confirm('Are you sure you want to delete this server container?')) {
+      return;
+    }
+
     setActionPending(true);
     try {
       await fetch(`/api/servers/${serverId}/docker/action`, {
@@ -83,43 +166,13 @@ export default function ServerControl({ serverId }: ServerControlProps) {
           Status: <span className="text-zinc-200 capitalize">{statusData?.status || 'Unknown'}</span>
         </div>
 
-        <div className="flex gap-2 pt-2">
-          {!containerExists ? (
-            <Button
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white"
-              disabled={actionPending}
-              onClick={() => handleAction('create')}
-            >
-              Create Server
-            </Button>
-          ) : !isRunning ? (
-            <Button
-              className="w-full bg-emerald-600 hover:bg-emerald-500"
-              disabled={actionPending}
-              onClick={() => handleAction('start')}
-            >
-              Start Server
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant="destructive"
-                className="w-full"
-                disabled={actionPending}
-                onClick={() => handleAction('stop')}
-              >
-                Stop Server
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full border-zinc-700 hover:bg-zinc-800 text-zinc-100"
-                disabled={actionPending}
-                onClick={() => handleAction('restart')}
-              >
-                Restart
-              </Button>
-            </>
-          )}
+        <div className="pt-2">
+          <ServerActionButtons
+            containerExists={containerExists}
+            isRunning={isRunning}
+            actionPending={actionPending}
+            onAction={handleAction}
+          />
         </div>
       </CardContent>
     </Card>

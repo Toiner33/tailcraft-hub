@@ -10,12 +10,12 @@ export async function POST(
 
   // Validate that the target server directory exists.
   const server = await getServerById(serverId);
-    if (!server) {
-      return NextResponse.json(
-        { success: false, error: `Server with ID ${serverId} not found.` },
-        { status: 404 }
-      );
-    }
+  if (!server) {
+    return NextResponse.json(
+      { success: false, error: `Server with ID ${serverId} not found.` },
+      { status: 404 }
+    );
+  }
 
   try {
     const body = await request.json();

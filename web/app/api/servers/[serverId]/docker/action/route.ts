@@ -118,6 +118,12 @@ export async function POST(
         await container.restart();
         scheduleGameruleSync(server, 5000, DOCKER_ACTIONS.RESTART);
         break;
+
+      case DOCKER_ACTIONS.DELETE:
+        if (!container) throw new Error('Container instance is missing.');
+        // force: true automatically stops and removes the container whether it's running or stopped
+        await container.remove({ force: true });
+        break;
     }
 
     return NextResponse.json({
