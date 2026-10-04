@@ -57,10 +57,10 @@ function serializeProperties(properties: Record<string, string>, server: ServerP
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { serverId: string } }
+  { params }: { params: Promise<{ serverId: string }> }
 ) {
   try { 
-    const { serverId } = params;
+    const { serverId } = await params;
 
     // Validate that the target server exists.
     const server = await getServerById(serverId);
@@ -92,10 +92,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { serverId: string } }
+  { params }: { params: Promise<{ serverId: string }> }
 ) {
   try {
-    const { serverId } = params;
+    const { serverId } = await params;
 
     // Validate that the target server exists.
     const server = await getServerById(serverId);

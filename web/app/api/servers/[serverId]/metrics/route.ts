@@ -37,10 +37,10 @@ async function getFolderSize(dirPath: string): Promise<number> {
 
 export async function GET(
   request: Request,
-  { params }: { params: { serverId: string } }
+  { params }: { params: Promise<{ serverId: string }> }
 ) {
   try {
-    const { serverId } = params;
+    const { serverId } = await params;
 
     // Validate that the target server exists.
     const server = await getServerById(serverId);
@@ -51,32 +51,53 @@ export async function GET(
       );
     }
 
-    // Get the Docker container associated with the server
-    const container = await getContainerByServerId(server.id);
+    // Default fallback values for container metrics when stopped/offline
+    let containerCpuPercent = 0;
+    let containerRamBytes = 0;
+    let containerRamLimitBytes = 1;
+    let containerRamPercent = '0.0';
+    let containerVsHostRamPercent = '0.0';
 
-    // Fetch container statistics snapshot
-    const stats = await container.stats({ stream: false });
+    try {
+      const container = await getContainerByServerId(server.id);
+      const containerInfo = await container.inspect();
 
-    // --- 1. Container Memory Usage ---
-    const containerRamBytes = stats.memory_stats.usage || 0;
-    const containerRamLimitBytes = stats.memory_stats.limit || 1;
-    const containerRamPercent = ((containerRamBytes / containerRamLimitBytes) * 100).toFixed(PERCENT_DECIMALS);
+      if (containerInfo.State.Running) {
+        const statsStream = (await container.stats({ stream: false })) as any;
+        const stats = typeof statsStream.pipe === 'function' || typeof statsStream.on === 'function'
+          ? await new Promise((resolve, reject) => {
+              let data = '';
+              statsStream.on('data', (chunk: Buffer) => (data += chunk));
+              statsStream.on('end', () => {
+                try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
+              });
+              statsStream.on('error', reject);
+            })
+          : statsStream;
 
-    // --- 2. Container CPU Usage ---
-    const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
-    const systemCpuDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
-    const numberCpus = stats.cpu_stats.online_cpus || os.cpus().length;
+        if (stats && stats.memory_stats && stats.cpu_stats) {
+          containerRamBytes = stats.memory_stats.usage || 0;
+          containerRamLimitBytes = stats.memory_stats.limit || 1;
+          containerRamPercent = ((containerRamBytes / containerRamLimitBytes) * 100).toFixed(PERCENT_DECIMALS);
 
-    let containerCpuPercent = '0.0';
-    if (systemCpuDelta > 0 && cpuDelta > 0) {
-      containerCpuPercent = ((cpuDelta / systemCpuDelta) * numberCpus * 100).toFixed(PERCENT_DECIMALS);
+          const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
+          const systemCpuDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
+          const numberCpus = stats.cpu_stats.online_cpus || os.cpus().length;
+
+          if (systemCpuDelta > 0 && cpuDelta > 0) {
+            containerCpuPercent = parseFloat(((cpuDelta / systemCpuDelta) * numberCpus * 100).toFixed(PERCENT_DECIMALS));
+          }
+        }
+      }
+    } catch {
+      // Container not found or docker daemon issue — safely keep defaults (0)
     }
 
-    // --- 3. World Data Directory Size (Fixed to use server.id instead of server.name) ---
+    // --- World Data Directory Size ---
     const serverFolder = path.join(APP_CONFIG.serversRootDir, server.id);
     const folderSizeBytes = await getFolderSize(serverFolder);
 
-    // --- 4. Host Machine Metrics (Cross-Platform Memory Inspection) ---
+    // --- Host Machine Metrics ---
     const memData = await si.mem();
     const hostRamUsedBytes = memData.active;
     const hostRamTotalBytes = memData.total;
@@ -85,8 +106,10 @@ export async function GET(
     const fsData = await si.fsSize();
     const primaryDisk = fsData[0] || { size: 0, used: 0, available: 0, use: 0 };
 
-    // --- 5. Relative Metric Calculations ---
-    const containerVsHostRamPercent = ((containerRamBytes / hostRamTotalBytes) * 100).toFixed(PERCENT_DECIMALS);
+    if (hostRamTotalBytes > 0) {
+      containerVsHostRamPercent = ((containerRamBytes / hostRamTotalBytes) * 100).toFixed(PERCENT_DECIMALS);
+    }
+
     const folderVsDiskPercent = primaryDisk.size > 0 
       ? ((folderSizeBytes / primaryDisk.size) * 100).toFixed(PERCENT_DECIMALS) 
       : '0.0';
@@ -95,7 +118,7 @@ export async function GET(
       success: true,
       metrics: {
         container: {
-          cpuPercent: parseFloat(containerCpuPercent),
+          cpuPercent: containerCpuPercent,
           ramUsedMB: (containerRamBytes / BYTES_PER_MB).toFixed(NO_DECIMALS),
           ramLimitMB: (containerRamLimitBytes / BYTES_PER_MB).toFixed(NO_DECIMALS),
           ramPercent: parseFloat(containerRamPercent),

@@ -4,9 +4,9 @@ import { getServerById } from '@/lib/serverRegistry';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { serverId: string } }
+  { params }: { params: Promise<{ serverId: string }> }
 ) {
-  const { serverId } = params;
+  const { serverId } = await params;
 
   // Validate that the target server directory exists.
   const server = await getServerById(serverId);

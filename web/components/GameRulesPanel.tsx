@@ -69,7 +69,7 @@ export default function GamerulesPanel({ serverId }: GamerulesPanelProps) {
       if (isUpdatingRef.current) return;
 
       try {
-        const res = await fetch(`/api/servers/${serverId}/docker`);
+        const res = await fetch(`/api/servers/${serverId}/docker/status`);
         const data = await res.json();
         const isRunning = Boolean(data.running);
 

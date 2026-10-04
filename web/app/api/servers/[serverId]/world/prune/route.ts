@@ -12,10 +12,10 @@ const CHUNKS_EXTENSION = '.mca';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { serverId: string } }
+  { params }: { params: Promise<{ serverId: string }> }
 ) {
   try {
-    const { serverId } = params;
+    const { serverId } = await params;
 
     // Validate the existence of the target server.
     const server = await getServerById(serverId);

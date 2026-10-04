@@ -49,7 +49,7 @@ export default async function ServerDashboardPage({ params }: ServerDashboardPag
         <DimensionAnalytics serverId={serverId} />
         <GameRulesPanel serverId={serverId} />
         {/* Side-by-side or stacked terminal and logs */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="w-full max-w-5xl flex flex-col items-center space-y-6">
           <RconConsole serverId={serverId} />
           <DockerLogs serverId={serverId} />
         </div>

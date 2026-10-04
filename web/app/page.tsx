@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ServerProfile, ServerEngine, SERVER_ENGINES } from '@/types/server';
-import { createServerId, createRconPassword } from '@/lib/serverRegistry';
-import { APP_CONFIG } from '@/lib/config';
+import { SERVER_DEFAULTS_FALLBACKS } from '@/lib/constants';
 
 // ==========================================
 // 1. SUB-COMPONENT: Server Grid / List View
@@ -104,7 +103,7 @@ interface CreateModalProps {
   version: string;
   setVersion: (v: string) => void;
   memoryMB: number;
-  setMemoryMB: (v: number) => void;
+  setMemoryMB: (v: number | ((prev: number) => number)) => void;
   showAdvancedPorts: boolean;
   setShowAdvancedPorts: (v: boolean) => void;
   gamePort: string;
@@ -147,6 +146,16 @@ function CreateServerModal({
 }: CreateModalProps) {
   if (!isOpen) return null;
 
+  const memoryStep = 512;
+
+  const handleDecreaseMemory = () => {
+    setMemoryMB((prev) => Math.max(1024, prev - memoryStep));
+  };
+
+  const handleIncreaseMemory = () => {
+    setMemoryMB((prev) => prev + memoryStep);
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <Card className="w-full max-w-lg border-zinc-800 bg-zinc-900 text-zinc-100 shadow-2xl">
@@ -188,17 +197,22 @@ function CreateServerModal({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-zinc-300">Engine</label>
-                <select
-                  value={engine}
-                  onChange={(e) => setEngine(e.target.value as ServerEngine)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-xs text-zinc-200 focus:outline-none"
-                >
-                  {SERVER_ENGINES.map((eng) => (
-                    <option key={eng.value} value={eng.value}>
-                      {eng.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={engine}
+                    onChange={(e) => setEngine(e.target.value as ServerEngine)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 pr-8 text-xs text-zinc-200 focus:outline-none appearance-none"
+                  >
+                    {SERVER_ENGINES.map((eng) => (
+                      <option key={eng.value} value={eng.value}>
+                        {eng.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-zinc-400 text-xs">
+                    ▼
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -213,17 +227,36 @@ function CreateServerModal({
               </div>
             </div>
 
+            {/* Allocated RAM with Stepper Buttons */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-zinc-300">Allocated RAM (MB)</label>
-              <input
-                type="number"
-                required
-                step={512}
-                min={1024}
-                value={memoryMB}
-                onChange={(e) => setMemoryMB(Number(e.target.value))}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-xs font-mono text-zinc-100 focus:outline-none focus:border-zinc-600"
-              />
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDecreaseMemory}
+                  className="h-8 px-3 border-zinc-800 bg-zinc-950 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs font-mono"
+                >
+                  -
+                </Button>
+                <input
+                  type="number"
+                  required
+                  step={memoryStep}
+                  min={1024}
+                  value={memoryMB}
+                  onChange={(e) => setMemoryMB(Number(e.target.value))}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-xs font-mono text-zinc-100 text-center focus:outline-none focus:border-zinc-600"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleIncreaseMemory}
+                  className="h-8 px-3 border-zinc-800 bg-zinc-950 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs font-mono"
+                >
+                  +
+                </Button>
+              </div>
             </div>
 
             {/* Advanced Manual Port Toggle & Inputs */}
@@ -313,34 +346,31 @@ export default function Home() {
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string>('');
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [formError, setFormError] = useState<string>('');
 
-  // Form Inputs
-  const [serverId, setServerId] = useState<string>(createServerId());
+  const [serverId, setServerId] = useState<string>('');
   const [name, setName] = useState<string>('');
-  const [engine, setEngine] = useState<ServerEngine>(APP_CONFIG.defaults.engine);
-  const [version, setVersion] = useState<string>(APP_CONFIG.defaults.version);
-  const [memoryMB, setMemoryMB] = useState<number>(APP_CONFIG.defaults.memoryMB);
+  const [engine, setEngine] = useState<ServerEngine>(SERVER_DEFAULTS_FALLBACKS.engine);
+  const [version, setVersion] = useState<string>(SERVER_DEFAULTS_FALLBACKS.version);
+  const [memoryMB, setMemoryMB] = useState<number>(SERVER_DEFAULTS_FALLBACKS.memoryMB);
 
-  // Advanced Manual Port Controls
   const [showAdvancedPorts, setShowAdvancedPorts] = useState<boolean>(false);
   const [gamePort, setGamePort] = useState<string>('');
   const [rconPort, setRconPort] = useState<string>('');
   const [rconPassword, setRconPassword] = useState<string>('');
 
-  // Placeholders for auto-assigned previews
-  const [suggestedGamePort, setSuggestedGamePort] = useState<number>(APP_CONFIG.defaults.gamePort);
-  const [suggestedRconPort, setSuggestedRconPort] = useState<number>(APP_CONFIG.defaults.rconPort);
-  const [suggestedRconPass, setSuggestedRconPass] = useState<string>(createRconPassword());
+  const [suggestedGamePort, setSuggestedGamePort] = useState<number>(SERVER_DEFAULTS_FALLBACKS.gamePort);
+  const [suggestedRconPort, setSuggestedRconPort] = useState<number>(SERVER_DEFAULTS_FALLBACKS.rconPort);
+  const [suggestedRconPass, setSuggestedRconPass] = useState<string>(SERVER_DEFAULTS_FALLBACKS.rconPassword);
 
   const fetchServers = async () => {
     try {
       setLoading(true);
       const res = await fetch('/api/servers');
       const data = await res.json();
+      
       if (data.success) {
         setServers(data.servers);
       } else {
@@ -359,9 +389,14 @@ export default function Home() {
 
   const openCreateModal = async () => {
     setFormError('');
+    setGamePort('');
+    setRconPort('');
+    setRconPassword('');
+
     try {
       const res = await fetch('/api/servers/template');
       const data = await res.json();
+      
       if (data.success) {
         const d = data.defaults;
         setServerId(d.id);
@@ -369,16 +404,17 @@ export default function Home() {
         setEngine(d.engine);
         setVersion(d.version);
         setMemoryMB(d.memoryMB);
+        
         setSuggestedGamePort(d.gamePort);
         setSuggestedRconPort(d.rconPort);
         setSuggestedRconPass(d.rconPassword);
       }
     } catch {
-      setServerId(createServerId());
+      setServerId(`srv-failed-${servers.length + 1}`);
       setName(`Server ${servers.length + 1}`);
-      setEngine(APP_CONFIG.defaults.engine);
-      setVersion(APP_CONFIG.defaults.version);
-      setMemoryMB(APP_CONFIG.defaults.memoryMB);
+      setEngine(SERVER_DEFAULTS_FALLBACKS.engine);
+      setVersion(SERVER_DEFAULTS_FALLBACKS.version);
+      setMemoryMB(SERVER_DEFAULTS_FALLBACKS.memoryMB);
     }
     setIsModalOpen(true);
   };
@@ -397,8 +433,8 @@ export default function Home() {
       };
 
       if (showAdvancedPorts) {
-        if (gamePort) payload.gamePort = parseInt(gamePort, 10);
-        if (rconPort) payload.rconPort = parseInt(rconPort, 10);
+        if (gamePort.trim()) payload.gamePort = parseInt(gamePort, 10);
+        if (rconPort.trim()) payload.rconPort = parseInt(rconPort, 10);
         if (rconPassword.trim()) payload.rconPassword = rconPassword.trim();
       }
 
@@ -429,7 +465,6 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-start p-8 bg-zinc-950 text-zinc-100">
-      {/* Header */}
       <div className="w-full max-w-5xl mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
         <div>
           <h1 className="text-4xl font-extrabold tracking-tight text-white mb-2">TailCraft Hub</h1>
@@ -450,7 +485,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Server Grid Sub-Component */}
       <div className="w-full max-w-5xl">
         <ServerGrid
           loading={loading}
@@ -459,7 +493,6 @@ export default function Home() {
         />
       </div>
 
-      {/* Create Server Modal Sub-Component */}
       <CreateServerModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

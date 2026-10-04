@@ -123,10 +123,10 @@ async function updateWorldProperties(server: ServerProfile, payload: ResetPayloa
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { serverId: string } }
+  { params }: { params: Promise<{ serverId: string }> }
 ) {
   try {
-    const { serverId } = params;
+    const { serverId } = await params;
 
     // Validate server existence
     const server = await getServerById(serverId);

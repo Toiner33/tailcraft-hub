@@ -9,12 +9,13 @@ interface ServerStatus {
   success: boolean;
   status: string;
   running: boolean;
+  exists?: boolean;
   startedAt?: string;
   name?: string;
 }
 
 interface ServerControlProps {
-  serverId: string; // Accept serverId as a prop
+  serverId: string;
 }
 
 export default function ServerControl({ serverId }: ServerControlProps) {
@@ -22,10 +23,9 @@ export default function ServerControl({ serverId }: ServerControlProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const [actionPending, setActionPending] = useState<boolean>(false);
 
-  // Function to poll backend status API for this specific server
   const fetchStatus = async () => {
     try {
-      const res = await fetch(`/api/servers/${serverId}/docker`);
+      const res = await fetch(`/api/servers/${serverId}/docker/status`);
       const data = await res.json();
       setStatusData(data);
     } catch (err) {
@@ -35,23 +35,20 @@ export default function ServerControl({ serverId }: ServerControlProps) {
     }
   };
 
-  // Poll status every 5 seconds, re-running if serverId changes
   useEffect(() => {
     fetchStatus();
     const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
   }, [serverId]);
 
-  // Function to trigger Start/Stop/Restart actions for this specific server
-  const handleAction = async (action: 'start' | 'stop' | 'restart') => {
+  const handleAction = async (action: 'create' | 'start' | 'stop' | 'restart') => {
     setActionPending(true);
     try {
-      await fetch(`/api/servers/${serverId}/docker`, {
+      await fetch(`/api/servers/${serverId}/docker/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
       });
-      // Refresh status immediately after triggering action
       await fetchStatus();
     } catch (err) {
       console.error(`Failed to execute ${action}:`, err);
@@ -61,6 +58,7 @@ export default function ServerControl({ serverId }: ServerControlProps) {
   };
 
   const isRunning = statusData?.running ?? false;
+  const containerExists = statusData?.exists ?? false;
 
   return (
     <Card className="w-full max-w-md shadow-lg border-zinc-800 bg-zinc-900 text-zinc-100">
@@ -72,10 +70,12 @@ export default function ServerControl({ serverId }: ServerControlProps) {
           className={
             isRunning
               ? 'bg-emerald-600 hover:bg-emerald-500'
-              : 'bg-rose-600 hover:bg-rose-500'
+              : containerExists
+              ? 'bg-amber-600 hover:bg-amber-500'
+              : 'bg-zinc-600 hover:bg-zinc-500'
           }
         >
-          {loading ? 'Checking...' : isRunning ? 'ONLINE' : 'OFFLINE'}
+          {loading ? 'Checking...' : isRunning ? 'ONLINE' : containerExists ? 'STOPPED' : 'NOT CREATED'}
         </Badge>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -84,7 +84,15 @@ export default function ServerControl({ serverId }: ServerControlProps) {
         </div>
 
         <div className="flex gap-2 pt-2">
-          {!isRunning ? (
+          {!containerExists ? (
+            <Button
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white"
+              disabled={actionPending}
+              onClick={() => handleAction('create')}
+            >
+              Create Server
+            </Button>
+          ) : !isRunning ? (
             <Button
               className="w-full bg-emerald-600 hover:bg-emerald-500"
               disabled={actionPending}

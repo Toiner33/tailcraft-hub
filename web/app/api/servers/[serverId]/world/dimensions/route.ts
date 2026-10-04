@@ -30,10 +30,10 @@ async function countGeneratedChunksInMca(filePath: string): Promise<number> {
 
 export async function GET(
   request: Request,
-  { params }: { params: { serverId: string } }
+  { params }: { params: Promise<{ serverId: string }> }
 ) {
   try {
-    const { serverId } = params;
+    const { serverId } = await params;
 
     // Validate that the target server exists.
     const server = await getServerById(serverId);

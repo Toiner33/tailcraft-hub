@@ -18,10 +18,10 @@ async function ensureDirectoryExists(dirPath: string) {
 
 export async function GET(
   request: Request,
-  { params }: { params: { serverId: string } }
+  { params }: { params: Promise<{ serverId: string }> }
 ) {
   try {
-    const { serverId } = params;
+    const { serverId } = await params;
  
     // Validate that the target server directory exists.
     const server = await getServerById(serverId);
@@ -73,10 +73,10 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { serverId: string } }
+  { params }: { params: Promise<{ serverId: string }> }
 ) {
   try {
-    const { serverId } = params;
+    const { serverId } = await params;
  
     // Validate that the target server directory exists.
     const server = await getServerById(serverId);
@@ -138,10 +138,10 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { serverId: string } }
+  { params }: { params: Promise<{ serverId: string }> }
 ) {
   try {
-    const { serverId } = params;
+    const { serverId } = await params;
 
     // Validate that the target server directory exists.
     const server = await getServerById(serverId);

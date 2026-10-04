@@ -26,7 +26,7 @@ export default function BackupManager({ serverId }: BackupManagerProps) {
 
   const fetchServerStatus = async () => {
     try {
-      const res = await fetch(`/api/servers/${serverId}/docker`);
+      const res = await fetch(`/api/servers/${serverId}/docker/status`);
       const data = await res.json();
       // Directly assign the boolean 'running' property from your API
       setIsServerRunning(Boolean(data.running));

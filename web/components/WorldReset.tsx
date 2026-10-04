@@ -20,7 +20,7 @@ export default function WorldReset({ serverId }: WorldResetProps) {
 
   const fetchServerStatus = async () => {
     try {
-      const res = await fetch(`/api/servers/${serverId}/docker`);
+      const res = await fetch(`/api/servers/${serverId}/docker/status`);
       const data = await res.json();
       setIsServerRunning(Boolean(data.running));
     } catch {

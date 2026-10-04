@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { ServerProfile, CreateServerInput } from '@/types/server';
 import { APP_CONFIG } from '@/lib/config';
 import { resolveRconHost } from '@/lib/rcon';
+import { SERVER_DEFAULTS_FALLBACKS } from '@/lib/constants';
 
 const FILE_ENCODING = 'utf-8';
 
@@ -24,7 +25,7 @@ export async function getServers(): Promise<ServerProfile[]> {
 }
 
 export async function saveServers(servers: ServerProfile[]): Promise<void> {
-  await ensureDirectory(APP_CONFIG.configsDir);
+  await ensureDirectory(APP_CONFIG.serversRootDir);
   await fs.writeFile(APP_CONFIG.serversFile, JSON.stringify(servers, null, 2), FILE_ENCODING);
 }
 
@@ -48,7 +49,7 @@ function resolvePorts(
     }
     gamePort = input.gamePort;
   } else {
-    gamePort = APP_CONFIG.defaults.gamePort;
+    gamePort = SERVER_DEFAULTS_FALLBACKS.gamePort;
     while (usedPorts.has(gamePort)) {
       gamePort++;
     }
@@ -62,7 +63,7 @@ function resolvePorts(
     }
     rconPort = input.rconPort;
   } else {
-    rconPort = APP_CONFIG.defaults.rconPort;
+    rconPort = SERVER_DEFAULTS_FALLBACKS.rconPort;
     while (usedPorts.has(rconPort)) {
       rconPort++;
     }
@@ -90,15 +91,15 @@ export async function createServer(input: Partial<CreateServerInput>): Promise<S
     servers
   );
 
-  const engine = input.engine || APP_CONFIG.defaults.engine;
+  const engine = input.engine || SERVER_DEFAULTS_FALLBACKS.engine;
   const now = new Date().toISOString();
 
   const newServer: ServerProfile = {
     id,
     name: input.name?.trim() || id,
     engine,
-    version: input.version || APP_CONFIG.defaults.version,
-    memoryMB: input.memoryMB || APP_CONFIG.defaults.memoryMB,
+    version: input.version || SERVER_DEFAULTS_FALLBACKS.version,
+    memoryMB: input.memoryMB || SERVER_DEFAULTS_FALLBACKS.memoryMB,
     gamePort,
     rcon: {
       host: resolveRconHost(process.env.RCON_HOST),
@@ -126,9 +127,9 @@ export async function getServerTemplate() {
   return {
     id,
     name: `Server ${servers.length + 1}`,
-    engine: APP_CONFIG.defaults.engine,
-    version: APP_CONFIG.defaults.version,
-    memoryMB: APP_CONFIG.defaults.memoryMB,
+    engine: SERVER_DEFAULTS_FALLBACKS.engine,
+    version: SERVER_DEFAULTS_FALLBACKS.version,
+    memoryMB: SERVER_DEFAULTS_FALLBACKS.memoryMB,
     gamePort,
     rconPort,
     rconPassword: createRconPassword(),
