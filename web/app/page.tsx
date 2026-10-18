@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ServerProfile, ServerEngine, SERVER_ENGINES, CreateServerInput } from '@/types/server';
+import { ServerProfile, ServerEngine, SERVER_ENGINES_MAP, CreateServerInput } from '@/types/server';
 import { SERVER_DEFAULTS_FALLBACKS } from '@/lib/constants';
 
 // ==========================================
@@ -102,10 +102,25 @@ function ServerGrid({
 // ==========================================
 // 2. SUB-COMPONENT: Create Server Modal
 // ==========================================
+
+// Dedicated helper function for fetching versions
+async function loadVersionsForEngine(engine: ServerEngine): Promise<string[]> {
+  try {
+    const res = await fetch(`/api/minecraft/versions?type=${engine}`);
+    const data = await res.json();
+    if (data.success && Array.isArray(data.versions) && data.versions.length > 0) {
+      return data.versions;
+    }
+  } catch {
+    // Fallback on network or parse error
+  }
+  return [SERVER_DEFAULTS_FALLBACKS.version];
+}
+
 interface CreateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (e: React.SubmitEvent<HTMLFormElement>) => void;
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   formError: string;
   submitting: boolean;
   serverId: string;
@@ -157,6 +172,56 @@ function CreateServerModal({
   suggestedRconPort,
   suggestedRconPass,
 }: CreateModalProps) {
+  // Local state for dynamic version fetching and input modes
+  const [availableVersions, setAvailableVersions] = useState<string[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState<boolean>(false);
+  const [isCustomVersion, setIsCustomVersion] = useState<boolean>(false);
+  const [useLatest, setUseLatest] = useState<boolean>(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+
+  // Handlers to keep checkboxes mutually exclusive
+  const handleUseLatestChange = (checked: boolean) => {
+    setUseLatest(checked);
+    if (checked) {
+      setIsCustomVersion(false);
+      setVersion(SERVER_DEFAULTS_FALLBACKS.version);
+    } else {
+      setVersion(availableVersions[0] || SERVER_DEFAULTS_FALLBACKS.version);
+    }
+  };
+
+  const handleCustomChange = (checked: boolean) => {
+    setIsCustomVersion(checked);
+    if (checked) {
+      setUseLatest(false);
+    }
+  };
+
+  // Fetch versions whenever the engine changes or modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let isMounted = true;
+    const updateVersions = async () => {
+      setLoadingVersions(true);
+      const fetchedVersions = await loadVersionsForEngine(engine);
+      
+      if (isMounted) {
+        setAvailableVersions(fetchedVersions);
+        if (!useLatest) {
+          setVersion(fetchedVersions[0] || SERVER_DEFAULTS_FALLBACKS.version);
+        }
+        setLoadingVersions(false);
+      }
+    };
+
+    updateVersions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [engine, isOpen]);
+
   if (!isOpen) return null;
 
   const memoryStep = 512;
@@ -171,14 +236,14 @@ function CreateServerModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg border-zinc-800 bg-zinc-900 text-zinc-100 shadow-2xl">
+      <Card className="w-full max-w-lg border-zinc-800 bg-zinc-900 text-zinc-100 shadow-2xl relative overflow-visible">
         <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-zinc-800">
           <CardTitle className="text-lg font-bold">Deploy New Minecraft Server</CardTitle>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-100 text-sm font-mono">
             ✕
           </button>
         </CardHeader>
-        <CardContent className="pt-4">
+        <CardContent className="pt-4 overflow-visible">
           <form onSubmit={onSubmit} className="space-y-4">
             {formError && (
               <div className="p-2.5 text-xs rounded bg-rose-950/50 border border-rose-800 text-rose-300">
@@ -216,8 +281,8 @@ function CreateServerModal({
                     onChange={(e) => setEngine(e.target.value as ServerEngine)}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 pr-8 text-xs text-zinc-200 focus:outline-none appearance-none"
                   >
-                    {SERVER_ENGINES.map((eng) => (
-                      <option key={eng.value} value={eng.value}>
+                    {Object.values(SERVER_ENGINES_MAP).map((eng) => (
+                      <option key={eng.nameId} value={eng.nameId}>
                         {eng.label}
                       </option>
                     ))}
@@ -228,15 +293,98 @@ function CreateServerModal({
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-300">Minecraft Version</label>
-                <input
-                  type="text"
-                  required
-                  value={version}
-                  onChange={(e) => setVersion(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-xs font-mono text-zinc-100 focus:outline-none focus:border-zinc-600"
-                />
+              <div className="space-y-1.5 flex flex-col justify-between relative">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-zinc-300">
+                    Minecraft Version {loadingVersions && <span className="text-[10px] text-zinc-500 animate-pulse">(Loading...)</span>}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[10px] text-emerald-400 flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useLatest}
+                        onChange={(e) => handleUseLatestChange(e.target.checked)}
+                        className="accent-emerald-600 h-3 w-3"
+                      />
+                      Latest
+                    </label>
+                    <label className="text-[10px] text-emerald-400 flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isCustomVersion}
+                        disabled={useLatest}
+                        onChange={(e) => handleCustomChange(e.target.checked)}
+                        className="accent-emerald-600 h-3 w-3 disabled:opacity-50"
+                      />
+                      Custom
+                    </label>
+                  </div>
+                </div>
+
+                {useLatest ? (
+                  <input
+                    type="text"
+                    disabled
+                    value={SERVER_DEFAULTS_FALLBACKS.version}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-xs font-mono text-zinc-400 cursor-not-allowed"
+                  />
+                ) : isCustomVersion ? (
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 1.21.4"
+                    value={version}
+                    onChange={(e) => setVersion(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-xs font-mono text-zinc-100 focus:outline-none focus:border-zinc-600"
+                  />
+                ) : (
+                  <div className="relative">
+                    {/* Trigger Button */}
+                    <button
+                      type="button"
+                      disabled={loadingVersions}
+                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded px-3 py-2 pr-8 text-xs font-mono text-zinc-200 text-left focus:outline-none flex items-center justify-between disabled:opacity-50 hover:border-zinc-700 transition-colors"
+                    >
+                      <span className="truncate">{version || 'Select version...'}</span>
+                      <span className="text-zinc-400 text-xs">▼</span>
+                    </button>
+
+                    {/* Elevated Floating Dropdown Menu */}
+                    {isDropdownOpen && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-20" 
+                          onClick={() => setIsDropdownOpen(false)} 
+                        />
+                        
+                        <div className="absolute top-full left-0 right-0 z-30 mt-1.5 bg-zinc-950 border border-zinc-700/80 rounded-md shadow-2xl max-h-48 overflow-y-auto divide-y divide-zinc-800/50">
+                          {availableVersions.length === 0 ? (
+                            <div className="px-3 py-2 text-xs text-zinc-500 italic">No versions available</div>
+                          ) : (
+                            availableVersions.map((ver) => (
+                              <button
+                                key={ver}
+                                type="button"
+                                onClick={() => {
+                                  setVersion(ver);
+                                  setIsDropdownOpen(false);
+                                }}
+                                className={`w-full text-left px-3 py-2 text-xs font-mono transition-colors ${
+                                  version === ver 
+                                    ? 'bg-emerald-950/70 text-emerald-300 font-semibold' 
+                                    : 'text-zinc-300 hover:bg-zinc-900 hover:text-white'
+                                }`}
+                              >
+                                {ver}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -432,7 +580,7 @@ export default function Home() {
     setIsModalOpen(true);
   };
 
-  const handleCreateServer = async (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleCreateServer = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError('');
     setSubmitting(true);
@@ -489,7 +637,6 @@ export default function Home() {
       const data = await res.json();
 
       if (data.success) {
-        // Refresh your server list or redirect
         await fetchServers();
       } else {
         console.error('Failed to delete server:', data.error);

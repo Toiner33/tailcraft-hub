@@ -11,7 +11,7 @@ export const SERVER_DEFAULTS_FALLBACKS = {
   rconPort: 25575,
   rconPassword: 'strong_password',
   memoryMB: 2048,
-  version: 'latest',
+  version: 'LATEST',
   engine: 'PAPER' as ServerEngine,
   worldDir: 'world',
   backupsDir: 'backups',
