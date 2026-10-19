@@ -7,25 +7,29 @@ import { Badge } from '@/components/ui/badge';
 import { DOCKER_ACTIONS, DockerAction } from '@/types/dockerActions';
 
 // ==========================================
-// 1. SUB-COMPONENT: ServerActionButtons to handle the correct button rendering based on server state
+// 1. SUB-COMPONENT: ServerActionButtons
 // ==========================================
 interface ServerActionButtonsProps {
   containerExists: boolean;
   isRunning: boolean;
+  outOfSync: boolean;
   actionPending: boolean;
   onAction: (action: DockerAction) => void;
+  onRecreate: () => void;
 }
 
 function ServerActionButtons({
   containerExists,
   isRunning,
+  outOfSync,
   actionPending,
   onAction,
+  onRecreate,
 }: ServerActionButtonsProps) {
   if (!containerExists) {
     return (
       <Button
-        className="w-full bg-blue-600 hover:bg-blue-500 text-white"
+        className="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold"
         disabled={actionPending}
         onClick={() => onAction(DOCKER_ACTIONS.CREATE)}
       >
@@ -34,11 +38,39 @@ function ServerActionButtons({
     );
   }
 
+  // If configuration was updated in JSON after container creation, prompt user to Recreate/Sync
+  if (outOfSync) {
+    return (
+      <div className="space-y-2">
+        <div className="p-2.5 text-xs rounded bg-amber-950/50 border border-amber-800 text-amber-300 text-center">
+          ⚠️ Server parameters have changed. Recreate container to apply updates.
+        </div>
+        <div className="flex gap-2">
+          <Button
+            className="flex-1 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold"
+            disabled={actionPending}
+            onClick={onRecreate}
+          >
+            Recreate Container
+          </Button>
+          <Button
+            variant="destructive"
+            className="text-xs px-3"
+            disabled={actionPending}
+            onClick={() => onAction(DOCKER_ACTIONS.DELETE)}
+          >
+            Delete
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (!isRunning) {
     return (
       <div className="flex gap-2">
         <Button
-          className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+          className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-xs"
           disabled={actionPending}
           onClick={() => onAction(DOCKER_ACTIONS.START)}
         >
@@ -46,7 +78,7 @@ function ServerActionButtons({
         </Button>
         <Button
           variant="destructive"
-          className="flex-1"
+          className="flex-1 text-xs"
           disabled={actionPending}
           onClick={() => onAction(DOCKER_ACTIONS.DELETE)}
         >
@@ -60,14 +92,14 @@ function ServerActionButtons({
     <div className="grid grid-cols-3 gap-2">
       <Button
         variant="destructive"
+        className="text-xs"
         disabled={actionPending}
         onClick={() => onAction(DOCKER_ACTIONS.STOP)}
       >
         Stop
       </Button>
       <Button
-        variant="outline"
-        className="border-zinc-700 hover:bg-zinc-800 text-zinc-100"
+        className="border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium"
         disabled={actionPending}
         onClick={() => onAction(DOCKER_ACTIONS.RESTART)}
       >
@@ -75,6 +107,7 @@ function ServerActionButtons({
       </Button>
       <Button
         variant="destructive"
+        className="text-xs"
         disabled={actionPending}
         onClick={() => onAction(DOCKER_ACTIONS.DELETE)}
       >
@@ -89,6 +122,7 @@ interface ServerStatus {
   status: string;
   running: boolean;
   exists?: boolean;
+  outOfSync?: boolean;
   startedAt?: string;
   name?: string;
 }
@@ -140,25 +174,58 @@ export default function ServerControl({ serverId }: ServerControlProps) {
     }
   };
 
+  // Recreate handler: deletes old container and spins up a new one with updated params
+  const handleRecreate = async () => {
+    if (!window.confirm('Recreating the container will apply your updated configuration parameters (RAM, version, ports). Your world data will be preserved. Continue?')) {
+      return;
+    }
+
+    setActionPending(true);
+    try {
+      // 1. Delete/Remove old container
+      await fetch(`/api/servers/${serverId}/docker/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: DOCKER_ACTIONS.DELETE }),
+      });
+
+      // 2. Create new container with updated parameters
+      await fetch(`/api/servers/${serverId}/docker/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: DOCKER_ACTIONS.CREATE }),
+      });
+
+      await fetchStatus();
+    } catch (err) {
+      console.error('Failed to recreate container:', err);
+    } finally {
+      setActionPending(false);
+    }
+  };
+
   const isRunning = statusData?.running ?? false;
   const containerExists = statusData?.exists ?? false;
+  const outOfSync = statusData?.outOfSync ?? false;
 
   return (
     <Card className="w-full max-w-md shadow-lg border-zinc-800 bg-zinc-900 text-zinc-100">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-xl font-bold">
+        <CardTitle className="text-xl font-bold truncate">
           {statusData?.name || 'Minecraft Server'}
         </CardTitle>
         <Badge
           className={
-            isRunning
+            outOfSync
+              ? 'bg-amber-600 hover:bg-amber-500'
+              : isRunning
               ? 'bg-emerald-600 hover:bg-emerald-500'
               : containerExists
               ? 'bg-amber-600 hover:bg-amber-500'
               : 'bg-zinc-600 hover:bg-zinc-500'
           }
         >
-          {loading ? 'Checking...' : isRunning ? 'ONLINE' : containerExists ? 'STOPPED' : 'NOT CREATED'}
+          {loading ? 'Checking...' : outOfSync ? 'OUT OF SYNC' : isRunning ? 'ONLINE' : containerExists ? 'STOPPED' : 'NOT CREATED'}
         </Badge>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -170,8 +237,10 @@ export default function ServerControl({ serverId }: ServerControlProps) {
           <ServerActionButtons
             containerExists={containerExists}
             isRunning={isRunning}
+            outOfSync={outOfSync}
             actionPending={actionPending}
             onAction={handleAction}
+            onRecreate={handleRecreate}
           />
         </div>
       </CardContent>

@@ -14,11 +14,13 @@ function ServerGrid({
   loading,
   servers,
   onOpenCreate,
+  onOpenEdit,
   onDelete,
 }: {
   loading: boolean;
   servers: ServerProfile[];
   onOpenCreate: () => void;
+  onOpenEdit: (server: ServerProfile) => void;
   onDelete: (serverId: string) => void;
 }) {
   if (loading) {
@@ -77,13 +79,20 @@ function ServerGrid({
               </p>
             </div>
             
-            {/* 2. Button Action Group (Manage + Delete side-by-side) */}
+            {/* Action Buttons Group (Manage, Edit, Delete) */}
             <div className="flex gap-2 pt-2">
               <Link href={`/servers/${server.id}`} className="flex-1">
                 <Button className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium border border-zinc-700">
                   Manage →
                 </Button>
               </Link>
+              <Button
+                variant="outline"
+                className="border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs px-3"
+                onClick={() => onOpenEdit(server)}
+              >
+                Edit
+              </Button>
               <Button
                 variant="destructive"
                 className="bg-rose-600 hover:bg-rose-500 text-white text-xs px-3"
@@ -100,10 +109,9 @@ function ServerGrid({
 }
 
 // ==========================================
-// 2. SUB-COMPONENT: Create Server Modal
+// 2. SUB-COMPONENT: Unified Server Modal (Create / Edit)
 // ==========================================
 
-// Dedicated helper function for fetching versions
 async function loadVersionsForEngine(engine: ServerEngine): Promise<string[]> {
   try {
     const res = await fetch(`/api/minecraft/versions?type=${engine}`);
@@ -117,10 +125,11 @@ async function loadVersionsForEngine(engine: ServerEngine): Promise<string[]> {
   return [SERVER_DEFAULTS_FALLBACKS.version];
 }
 
-interface CreateModalProps {
+interface ServerModalProps {
   isOpen: boolean;
+  isEditing: boolean;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  onSubmit: (e: React.SubmitEvent<HTMLFormElement>) => void;
   formError: string;
   submitting: boolean;
   serverId: string;
@@ -145,8 +154,9 @@ interface CreateModalProps {
   suggestedRconPass: string;
 }
 
-function CreateServerModal({
+function ServerModal({
   isOpen,
+  isEditing,
   onClose,
   onSubmit,
   formError,
@@ -171,15 +181,13 @@ function CreateServerModal({
   suggestedGamePort,
   suggestedRconPort,
   suggestedRconPass,
-}: CreateModalProps) {
-  // Local state for dynamic version fetching and input modes
+}: ServerModalProps) {
   const [availableVersions, setAvailableVersions] = useState<string[]>([]);
   const [loadingVersions, setLoadingVersions] = useState<boolean>(false);
   const [isCustomVersion, setIsCustomVersion] = useState<boolean>(false);
   const [useLatest, setUseLatest] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
 
-  // Handlers to keep checkboxes mutually exclusive
   const handleUseLatestChange = (checked: boolean) => {
     setUseLatest(checked);
     if (checked) {
@@ -197,7 +205,6 @@ function CreateServerModal({
     }
   };
 
-  // Fetch versions whenever the engine changes or modal opens
   useEffect(() => {
     if (!isOpen) return;
 
@@ -208,7 +215,7 @@ function CreateServerModal({
       
       if (isMounted) {
         setAvailableVersions(fetchedVersions);
-        if (!useLatest) {
+        if (!useLatest && !isEditing) {
           setVersion(fetchedVersions[0] || SERVER_DEFAULTS_FALLBACKS.version);
         }
         setLoadingVersions(false);
@@ -220,7 +227,7 @@ function CreateServerModal({
     return () => {
       isMounted = false;
     };
-  }, [engine, isOpen]);
+  }, [engine, isOpen, isEditing]);
 
   if (!isOpen) return null;
 
@@ -238,7 +245,9 @@ function CreateServerModal({
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <Card className="w-full max-w-lg border-zinc-800 bg-zinc-900 text-zinc-100 shadow-2xl relative overflow-visible">
         <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-zinc-800">
-          <CardTitle className="text-lg font-bold">Deploy New Minecraft Server</CardTitle>
+          <CardTitle className="text-lg font-bold">
+            {isEditing ? `Edit Server (${serverId})` : 'Deploy New Minecraft Server'}
+          </CardTitle>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-100 text-sm font-mono">
             ✕
           </button>
@@ -252,7 +261,7 @@ function CreateServerModal({
             )}
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-300">Server ID (Auto-assigned)</label>
+              <label className="text-xs font-medium text-zinc-300">Server ID</label>
               <input
                 type="text"
                 disabled
@@ -339,7 +348,6 @@ function CreateServerModal({
                   />
                 ) : (
                   <div className="relative">
-                    {/* Trigger Button */}
                     <button
                       type="button"
                       disabled={loadingVersions}
@@ -350,7 +358,6 @@ function CreateServerModal({
                       <span className="text-zinc-400 text-xs">▼</span>
                     </button>
 
-                    {/* Elevated Floating Dropdown Menu */}
                     {isDropdownOpen && (
                       <>
                         <div 
@@ -461,7 +468,7 @@ function CreateServerModal({
                   </div>
                   <div className="space-y-1">
                     <label className="text-[11px] text-zinc-500 font-mono">
-                      RCON Password (Auto-generated)
+                      RCON Password
                     </label>
                     <input
                       type="text"
@@ -489,7 +496,7 @@ function CreateServerModal({
                 disabled={submitting}
                 className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
               >
-                {submitting ? 'Deploying...' : 'Create Server'}
+                {submitting ? (isEditing ? 'Saving...' : 'Deploying...') : (isEditing ? 'Save Changes' : 'Create Server')}
               </Button>
             </div>
           </form>
@@ -508,6 +515,7 @@ export default function Home() {
   const [errorMsg, setErrorMsg] = useState<string>('');
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [formError, setFormError] = useState<string>('');
 
@@ -549,10 +557,12 @@ export default function Home() {
   }, []);
 
   const openCreateModal = async () => {
+    setIsEditing(false);
     setFormError('');
     setGamePort('');
     setRconPort('');
     setRconPassword('');
+    setShowAdvancedPorts(false);
 
     try {
       const res = await fetch('/api/servers/template');
@@ -580,57 +590,106 @@ export default function Home() {
     setIsModalOpen(true);
   };
 
-  const handleCreateServer = async (e: React.FormEvent<HTMLFormElement>) => {
+  const openEditModal = (server: ServerProfile) => {
+    setIsEditing(true);
+    setFormError('');
+    setShowAdvancedPorts(false);
+
+    setServerId(server.id);
+    setName(server.name);
+    setEngine(server.engine);
+    setVersion(server.version);
+    setMemoryMB(server.memoryMB);
+
+    setGamePort(server.gamePort ? String(server.gamePort) : '');
+    setRconPort(server.rcon?.port ? String(server.rcon.port) : '');
+    setRconPassword(server.rcon?.password || '');
+
+    setSuggestedGamePort(server.gamePort);
+    setSuggestedRconPort(server.rcon?.port || SERVER_DEFAULTS_FALLBACKS.rconPort);
+    setSuggestedRconPass(server.rcon?.password || SERVER_DEFAULTS_FALLBACKS.rconPassword);
+
+    setIsModalOpen(true);
+  };
+
+const handleSubmitServer = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError('');
     setSubmitting(true);
 
     try {
-      const payload: CreateServerInput = {
-        name: name.trim(),
-        engine,
-        version: version.trim(),
-        memoryMB: Number(memoryMB),
-      };
+      // Determine the final RCON password: use user input if filled, otherwise fallback to the suggested one
+      const finalRconPassword = rconPassword.trim() || suggestedRconPass;
 
-      if (showAdvancedPorts) {
-        if (gamePort.trim()) payload.gamePort = parseInt(gamePort, 10);
-        if (rconPort.trim()) payload.rconPort = parseInt(rconPort, 10);
-        if (rconPassword.trim()) payload.rconPassword = rconPassword.trim();
-      }
+      if (isEditing) {
+        const payload: Partial<ServerProfile> & { rconPort?: number; rconPassword?: string } = {
+          name: name.trim(),
+          engine,
+          version: version.trim(),
+          memoryMB: Number(memoryMB),
+          rconPassword: finalRconPassword, // Include password update
+        };
 
-      const res = await fetch('/api/servers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+        if (showAdvancedPorts) {
+          if (gamePort.trim()) payload.gamePort = parseInt(gamePort, 10);
+          if (rconPort.trim()) payload.rconPort = parseInt(rconPort, 10);
+        }
 
-      const data = await res.json();
+        const res = await fetch(`/api/servers/${serverId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
 
-      if (data.success) {
-        setIsModalOpen(false);
-        setShowAdvancedPorts(false);
-        setGamePort('');
-        setRconPort('');
-        setRconPassword('');
-        await fetchServers();
+        const data = await res.json();
+        if (data.success) {
+          setIsModalOpen(false);
+          await fetchServers();
+        } else {
+          setFormError(data.error || 'Failed to update server.');
+        }
       } else {
-        setFormError(data.error || 'Failed to create server.');
+        const payload: CreateServerInput = {
+          name: name.trim(),
+          engine,
+          version: version.trim(),
+          memoryMB: Number(memoryMB),
+          rconPassword: finalRconPassword, // Pass the generated/suggested password
+        };
+
+        if (showAdvancedPorts) {
+          if (gamePort.trim()) payload.gamePort = parseInt(gamePort, 10);
+          if (rconPort.trim()) payload.rconPort = parseInt(rconPort, 10);
+        }
+
+        const res = await fetch('/api/servers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          setIsModalOpen(false);
+          await fetchServers();
+        } else {
+          setFormError(data.error || 'Failed to create server.');
+        }
       }
     } catch {
-      setFormError('Network error while creating server.');
+      setFormError('Network error while saving server.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDeleteServer = async (serverId: string) => {
+  const handleDeleteServer = async (targetId: string) => {
     if (!window.confirm('Are you sure you want to delete this server profile and its container?')) {
       return;
     }
 
     try {
-      const res = await fetch(`/api/servers/${serverId}`, {
+      const res = await fetch(`/api/servers/${targetId}`, {
         method: 'DELETE',
       });
 
@@ -673,14 +732,16 @@ export default function Home() {
           loading={loading}
           servers={servers}
           onOpenCreate={openCreateModal}
+          onOpenEdit={openEditModal}
           onDelete={handleDeleteServer}
         />
       </div>
 
-      <CreateServerModal
+      <ServerModal
         isOpen={isModalOpen}
+        isEditing={isEditing}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreateServer}
+        onSubmit={handleSubmitServer}
         formError={formError}
         submitting={submitting}
         serverId={serverId}

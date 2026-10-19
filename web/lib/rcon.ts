@@ -29,6 +29,9 @@ export async function sendRconCommand(
     timeout: connection.timeoutMs ?? 5000,
   });
 
+  // Prevent unhandled socket error events (like ECONNRESET) from crashing the Node process
+  rcon.on('error', () => {});
+
   try {
     await rcon.connect();
     const response = await rcon.send(command);
@@ -66,6 +69,9 @@ export async function sendRconBatch(
     password: connection.password || process.env.RCON_PASSWORD || '',
     timeout: connection.timeoutMs ?? 5000,
   });
+
+  // Prevent unhandled socket error events from crashing the Node process
+  rcon.on('error', () => {});
 
   try {
     await rcon.connect();

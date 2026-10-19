@@ -21,13 +21,24 @@ export async function GET(
       const container = await getContainerByServerId(server.id);
       const data = await container.inspect();
 
+      // Check if server configuration was updated after the container was created
+      let outOfSync = false;
+      if (server.updatedAt && data.Created) {
+        const updatedAtTime = new Date(server.updatedAt).getTime();
+        const containerCreatedTime = new Date(data.Created).getTime();
+        if (updatedAtTime > containerCreatedTime) {
+          outOfSync = true;
+        }
+      }
+
       return NextResponse.json({
         success: true,
         exists: true,
         status: data.State.Status,
         running: data.State.Running,
         startedAt: data.State.StartedAt,
-        name: `${server.name}: ${data.Name.replace('/', '')}`,
+        outOfSync,
+        name: `${server.name}`,
       });
     } catch {
       return NextResponse.json({
@@ -35,7 +46,8 @@ export async function GET(
         exists: false,
         status: 'not created',
         running: false,
-        name: `${server.name}: unknown`,
+        outOfSync: false,
+        name: `${server.name}`,
       });
     }
   } catch (error: unknown) {
