@@ -3,57 +3,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import { APP_CONFIG } from '@/lib/config';
 import { getServerById } from '@/lib/serverRegistry';
-import { ServerProfile } from '@/types/server';
+import { parseProperties, serializeProperties, getLockedSystemProperties } from '@/lib/serverProperties';
 
 const FILE_ENCODING = 'utf-8';
-
-/**
- * Returns system-critical locked properties bound to this specific server's allocated ports.
- */
-function getLockedSystemProperties(server: ServerProfile): Record<string, string> {
-  return {
-    'enable-rcon': 'true',
-    'rcon.port': server.rcon.port.toString(),
-    'server-port': server.gamePort.toString(),
-  };
-}
-
-function parseProperties(content: string, server: ServerProfile): Record<string, string> {
-  const properties: Record<string, string> = {};
-  const lines = content.split(/\r?\n/);
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-
-    const separatorIndex = trimmed.indexOf('=');
-    // Sentinel value for invalid or missing character
-    const SEPARATOR_NOT_FOUND = -1;
-    if (separatorIndex !== SEPARATOR_NOT_FOUND) {
-      const key = trimmed.substring(0, separatorIndex).trim();
-      let value = trimmed.substring(separatorIndex + 1).trim();
-
-      // Clean backslashes before colons (e.g. minecraft\:normal -> minecraft:normal)
-      value = value.replace(/\\:/g, ':');
-      properties[key] = value;
-    }
-  }
-
-  // Enforce server-specific locked system values over user inputs
-  return { ...properties, ...getLockedSystemProperties(server) };
-}
-
-function serializeProperties(properties: Record<string, string>, server: ServerProfile): string {
-  // Always enforce server's unique assigned ports & RCON rules before writing
-  const safeProperties = { ...properties, ...getLockedSystemProperties(server) };
-
-  let output = `# Minecraft server properties\n# Managed by TailCraft Hub for ${server.id}\n`;
-  for (const [key, value] of Object.entries(safeProperties)) {
-    const cleanValue = String(value).replace(/\\:/g, ':');
-    output += `${key}=${cleanValue}\n`;
-  }
-  return output;
-}
 
 export async function GET(
   request: NextRequest,

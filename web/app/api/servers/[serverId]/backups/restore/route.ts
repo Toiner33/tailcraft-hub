@@ -5,6 +5,7 @@ import * as tar from 'tar';
 import { getContainerByServerId } from '@/lib/docker';
 import { APP_CONFIG } from '@/lib/config';
 import { getServerById } from '@/lib/serverRegistry';
+import { getWorldDirName } from '@/lib/serverProperties';
 
 const BACKUP_EXTENSION = '.tar.gz';
 
@@ -52,16 +53,18 @@ export async function POST(
     // No need to ensure directory exists, not being able to removes something doesn't exist is OK.
     const targetBackupPath = path.join(serverBackupsDir, safeFilename);
     
-
     try {
       await fs.access(targetBackupPath);
     } catch {
       return NextResponse.json({ success: false, error: 'Target backup file not found.' }, { status: 404 });
     }
 
+    // Dynamically resolve active world folder name from server.properties
+    const worldDirName = await getWorldDirName(serverId);
+    const serverWorldDir = path.join(APP_CONFIG.serversRootDir, serverId, worldDirName);
+
     // Create Safety Snapshot of Current World State to allow rollback in case of issues during restore
     let safetyBackupName = '';
-    const serverWorldDir = path.join(APP_CONFIG.serversRootDir, serverId, APP_CONFIG.worldDir);
 
     try {
       await fs.access(serverWorldDir);
@@ -75,7 +78,7 @@ export async function POST(
           file: safetyBackupPath,
           cwd: path.dirname(serverWorldDir),
         },
-        [APP_CONFIG.worldDir]
+        [worldDirName]
       );
     } catch {
       // Current live world directory did not exist; skip safety backup creation

@@ -6,6 +6,7 @@ import { getContainerByServerId } from '@/lib/docker';
 import { APP_CONFIG } from '@/lib/config';
 import { getServerById } from '@/lib/serverRegistry';
 import { ServerProfile } from '@/types/server';
+import { getWorldDirName } from '@/lib/serverProperties';
 
 interface ResetPayload {
   seed: string;
@@ -37,7 +38,7 @@ async function ensureServerStopped(serverId: string): Promise<void> {
  * Creates a safety backup of the existing world directory before wiping it.
  * Returns the generated backup filename, or an empty string if skipped.
  */
-async function createSafetyBackup(server: ServerProfile, worldDir: string): Promise<string> {
+async function createSafetyBackup(server: ServerProfile, worldDir: string, worldDirName: string): Promise<string> {
   try {
     const BACKUP_EXTENSION = '.tar.gz';
 
@@ -55,7 +56,7 @@ async function createSafetyBackup(server: ServerProfile, worldDir: string): Prom
         file: safetyBackupPath,
         cwd: path.dirname(worldDir),
       },
-      [APP_CONFIG.worldDir]
+      [worldDirName]
     );
 
     return safetyBackupName;
@@ -146,10 +147,12 @@ export async function POST(
       return NextResponse.json({ success: false, error: err.message }, { status: 400 });
     }
 
-    const worldDir = path.join(APP_CONFIG.serversRootDir, server.id, APP_CONFIG.worldDir);
+    // Dynamically resolve active world folder name from server.properties
+    const worldDirName = await getWorldDirName(server.id);
+    const worldDir = path.join(APP_CONFIG.serversRootDir, server.id, worldDirName);
 
     // 2. Take Pre-Reset Safety Backup & Wipe World Directory
-    const safetyBackupName = await createSafetyBackup(server, worldDir);
+    const safetyBackupName = await createSafetyBackup(server, worldDir, worldDirName);
     await resetWorldDirectory(worldDir);
 
     // 3. Update server.properties cleanly

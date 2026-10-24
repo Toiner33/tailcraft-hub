@@ -5,6 +5,7 @@ import * as tar from 'tar';
 import { APP_CONFIG } from '@/lib/config';
 import { getServerById } from '@/lib/serverRegistry';
 import { formatBytes } from '@/lib/utils';
+import { getWorldDirName } from '@/lib/serverProperties';
 
 const BACKUP_EXTENSION = '.tar.gz';
 
@@ -70,7 +71,6 @@ export async function GET(
   }
 }
 
-
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ serverId: string }> }
@@ -87,11 +87,13 @@ export async function POST(
       );
     }
 
-        // Read the backups directory for the specified server
+    // Read the backups directory for the specified server
     const serverBackupsDir = path.join(APP_CONFIG.serversRootDir, serverId, APP_CONFIG.backupsDir); 
     await ensureDirectoryExists(serverBackupsDir);
 
-    const serverWorldDir = path.join(APP_CONFIG.serversRootDir, serverId, APP_CONFIG.worldDir);
+    // Dynamically resolve world folder name from server.properties
+    const worldDirName = await getWorldDirName(serverId);
+    const serverWorldDir = path.join(APP_CONFIG.serversRootDir, serverId, worldDirName);
 
     // Verify world folder exists
     try {
@@ -115,7 +117,7 @@ export async function POST(
         file: destinationPath,
         cwd: path.dirname(serverWorldDir),
       },
-      [APP_CONFIG.worldDir]
+      [worldDirName]
     );
 
     const stats = await fs.stat(destinationPath);

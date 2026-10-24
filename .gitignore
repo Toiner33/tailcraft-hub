@@ -1,5 +1,4 @@
 # Ignore server data files
 data/
 .env.local
-roadmap/*
 servers/*
