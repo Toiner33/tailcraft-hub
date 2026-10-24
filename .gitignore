@@ -2,3 +2,6 @@
 data/
 .env.local
 servers/*
+.DS_Store
+context-dump.md
+files-*.md
