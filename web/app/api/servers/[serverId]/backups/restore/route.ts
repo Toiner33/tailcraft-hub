@@ -69,7 +69,7 @@ export async function POST(
     try {
       await fs.access(serverWorldDir);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      safetyBackupName = `pre-restore-safety-${timestamp}${BACKUP_EXTENSION}`;
+      safetyBackupName = `pre-restore-${worldDirName}-backup-${timestamp}${BACKUP_EXTENSION}`;
       const safetyBackupPath = path.join(serverBackupsDir, safetyBackupName);
 
       await tar.c(

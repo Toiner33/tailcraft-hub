@@ -100,14 +100,14 @@ export async function POST(
       await fs.access(serverWorldDir);
     } catch {
       return NextResponse.json(
-        { success: false, error: `World directory (${serverWorldDir}) does not exist.` },
+        { success: false, error: `World directory (${worldDirName}) does not exist.` },
         { status: 404 }
       );
     }
 
-    // Create backup file for the server's world directory
+    // Create backup file incorporating the world name
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupFilename = `world-backup-${timestamp}${BACKUP_EXTENSION}`;
+    const backupFilename = `${worldDirName}-backup-${timestamp}${BACKUP_EXTENSION}`;
     const destinationPath = path.join(serverBackupsDir, backupFilename);
 
     // Create tar.gz stream from world directory
