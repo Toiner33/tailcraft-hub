@@ -1,38 +1,19 @@
 // types/dimensions.ts
 
-export type DimensionId = 'overworld' | 'nether' | 'end';
-
-export interface DimensionConfig {
-  id: DimensionId;
-  name: string;
-  subPath: string; // Relative path inside the server data volume
-}
+export type DimensionId = string; // Now fully dynamic (e.g., "overworld", "nether", "DIM-1", or custom mod folders)
 
 export interface DimensionStats {
-  id: DimensionId;
-  name: string;
-  folderPath: string;
-  fileCount: number;
-  totalSizeBytes: number;
-  formattedSize: string;
-  chunkCount: number;
-  lastModified: string | null;
+  id: DimensionId;          // URL-safe slug or encoded path identifier
+  name: string;             // Human-readable display name (e.g., "Overworld", "The Nether")
+  folderPath: string;       // Relative path to the dimension folder
+  fileCount: number;        // Number of .mca files found
+  totalSizeBytes: number;   // Combined size in bytes
+  formattedSize: string;    // Human-readable size string
+  chunkCount: number;       // Total generated chunks across all MCA files
+  lastModified: string | null; // ISO timestamp of latest modification
 }
 
-// Single Source of Truth for all dimensions across backend & frontend
-export const DIMENSIONS: readonly DimensionConfig[] = [
-  { id: 'overworld', name: 'Overworld', subPath: 'world/region' },
-  { id: 'nether', name: 'The Nether', subPath: 'world/DIM-1/region' },
-  { id: 'end', name: 'The End', subPath: 'world/DIM1/region' },
-] as const;
-
-// Type guard to validate whether an unknown string is a valid DimensionId
+// Type guard for dynamic dimension IDs (accepts any non-empty string)
 export function isValidDimensionId(id: unknown): id is DimensionId {
-  return typeof id === 'string' && DIMENSIONS.some((d) => d.id === id);
-}
-
-// Helper function using strict DimensionId
-export function getDimensionSubPath(dimensionId: DimensionId): string {
-  const config = DIMENSIONS.find((d) => d.id === dimensionId);
-  return config!.subPath;
+  return typeof id === 'string' && id.trim().length > 0;
 }
