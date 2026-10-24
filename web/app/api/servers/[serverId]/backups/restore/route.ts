@@ -63,13 +63,14 @@ export async function POST(
     const worldDirName = await getWorldDirName(serverId);
     const serverWorldDir = path.join(APP_CONFIG.serversRootDir, serverId, worldDirName);
 
-    // Create Safety Snapshot of Current World State to allow rollback in case of issues during restore
+    // Create Safety Snapshot of Current World State incorporating [worldName]-[purpose]-backup-[engine]-[version]-[timestamp]
     let safetyBackupName = '';
 
     try {
       await fs.access(serverWorldDir);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      safetyBackupName = `pre-restore-${worldDirName}-backup-${timestamp}${BACKUP_EXTENSION}`;
+      const PURPOSE = 'pre-restore';
+      safetyBackupName = `${worldDirName}-${PURPOSE}-backup-${server.engine}-${server.version}-${timestamp}${BACKUP_EXTENSION}`;
       const safetyBackupPath = path.join(serverBackupsDir, safetyBackupName);
 
       await tar.c(

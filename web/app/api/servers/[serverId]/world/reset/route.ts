@@ -47,7 +47,8 @@ async function createSafetyBackup(server: ServerProfile, worldDir: string, world
     await fs.mkdir(backupsDir, { recursive: true });
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const safetyBackupName = `pre-reset-${worldDirName}-backup-${timestamp}${BACKUP_EXTENSION}`;
+    const PURPOSE = 'pre-reset';
+    const safetyBackupName = `${worldDirName}-${PURPOSE}-backup-${server.engine}-${server.version}-${timestamp}${BACKUP_EXTENSION}`;
     const safetyBackupPath = path.join(backupsDir, safetyBackupName);
 
     await tar.c(

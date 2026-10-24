@@ -105,9 +105,10 @@ export async function POST(
       );
     }
 
-    // Create backup file incorporating the world name
+    // Create backup file incorporating [worldName]-[purpose]-backup-[engine]-[version]-[timestamp]
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupFilename = `${worldDirName}-backup-${timestamp}${BACKUP_EXTENSION}`;
+    const PURPOSE = 'user-trigger';
+    const backupFilename = `${worldDirName}-${PURPOSE}-backup-${server.engine}-${server.version}-${timestamp}${BACKUP_EXTENSION}`;
     const destinationPath = path.join(serverBackupsDir, backupFilename);
 
     // Create tar.gz stream from world directory
