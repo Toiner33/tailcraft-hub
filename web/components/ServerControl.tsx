@@ -154,8 +154,41 @@ export default function ServerControl({ serverId }: ServerControlProps) {
     return () => clearInterval(interval);
   }, [serverId]);
 
+  // Extracted helper for container deletion with optional safety backup
+  const handleDelete = async () => {
+    const shouldDelete = window.confirm('Are you sure you want to delete this server container?');
+    if (!shouldDelete) {
+      return;
+    }
+
+    const createBackup = window.confirm(
+      'Would you like to create a safety backup of your world before deleting the container? (Recommended)'
+    );
+
+    setActionPending(true);
+    try {
+      await fetch(`/api/servers/${serverId}/docker/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: DOCKER_ACTIONS.DELETE, createSafetyBackup: createBackup }),
+      });
+
+      if (createBackup) {
+        // Notify BackupManager component to refresh its list
+        window.dispatchEvent(new Event('backupListUpdated'));
+      }
+
+      await fetchStatus();
+    } catch (err) {
+      console.error('Failed to execute delete:', err);
+    } finally {
+      setActionPending(false);
+    }
+  };
+
   const handleAction = async (action: DockerAction) => {
-    if (action === DOCKER_ACTIONS.DELETE && !window.confirm('Are you sure you want to delete this server container?')) {
+    if (action === DOCKER_ACTIONS.DELETE) {
+      await handleDelete();
       return;
     }
 
@@ -174,20 +207,32 @@ export default function ServerControl({ serverId }: ServerControlProps) {
     }
   };
 
-  // Recreate handler: deletes old container and spins up a new one with updated params
+  // Recreate handler: prompts user to recreate and optionally take a safety backup
   const handleRecreate = async () => {
-    if (!window.confirm('Recreating the container will apply your updated configuration parameters (RAM, version, ports). Your world data will be preserved. Continue?')) {
+    const shouldRecreate = window.confirm(
+      'Recreating the container will apply your updated configuration parameters (RAM, version, ports). Continue?'
+    );
+    if (!shouldRecreate) {
       return;
     }
 
+    const createBackup = window.confirm(
+      'Would you like to create a safety backup of your world before recreating? (Recommended)'
+    );
+
     setActionPending(true);
     try {
-      // 1. Delete/Remove old container
+      // 1. Delete old container with safety backup option based on user choice
       await fetch(`/api/servers/${serverId}/docker/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: DOCKER_ACTIONS.DELETE }),
+        body: JSON.stringify({ action: DOCKER_ACTIONS.DELETE, createSafetyBackup: createBackup }),
       });
+
+      if (createBackup) {
+        // Notify BackupManager component to refresh its list
+        window.dispatchEvent(new Event('backupListUpdated'));
+      }
 
       // 2. Create new container with updated parameters
       await fetch(`/api/servers/${serverId}/docker/action`, {

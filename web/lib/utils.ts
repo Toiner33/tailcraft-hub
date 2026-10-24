@@ -1,3 +1,6 @@
+import fs from 'fs/promises';
+import path from 'path';
+
 /**
  * Formats a byte count into a human-readable string (e.g., 4.5 MB, 1.2 GB).
  */
@@ -13,4 +16,26 @@ export function formatBytes(bytes: number, decimals: number = 2): string {
 
   const formattedValue = parseFloat((bytes / Math.pow(KIB, unitIndex)).toFixed(decimals));
   return `${formattedValue} ${UNITS[unitIndex]}`;
+}
+
+/**
+ * Recursively calculates the total size in bytes of a directory.
+ */
+export async function getFolderSize(dirPath: string): Promise<number> {
+  let totalSizeBytes = 0;
+  try {
+    const files = await fs.readdir(dirPath, { withFileTypes: true });
+    for (const file of files) {
+      const filePath = path.join(dirPath, file.name);
+      if (file.isDirectory()) {
+        totalSizeBytes += await getFolderSize(filePath);
+      } else if (file.isFile()) {
+        const stats = await fs.stat(filePath);
+        totalSizeBytes += stats.size;
+      }
+    }
+  } catch {
+    // Return 0 if directory is missing or inaccessible
+  }
+  return totalSizeBytes;
 }

@@ -6,8 +6,8 @@ import { getContainerByServerId } from '@/lib/docker';
 import { APP_CONFIG } from '@/lib/config';
 import { getServerById } from '@/lib/serverRegistry';
 import { getWorldDirName } from '@/lib/serverProperties';
-
-const BACKUP_EXTENSION = '.tar.gz';
+import { createServerBackup } from '@/lib/backupManager';
+import { BACKUP_PURPOSES } from '@/types/backup';
 
 export async function POST(
   request: NextRequest,
@@ -63,24 +63,15 @@ export async function POST(
     const worldDirName = await getWorldDirName(serverId);
     const serverWorldDir = path.join(APP_CONFIG.serversRootDir, serverId, worldDirName);
 
-    // Create Safety Snapshot of Current World State incorporating [worldName]-[purpose]-backup-[engine]-[version]-[timestamp]
+    // Create Safety Snapshot of Current World State using centralized backup manager
     let safetyBackupName = '';
 
     try {
       await fs.access(serverWorldDir);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const PURPOSE = 'pre-restore';
-      safetyBackupName = `${worldDirName}-${PURPOSE}-backup-${server.engine}-${server.version}-${timestamp}${BACKUP_EXTENSION}`;
-      const safetyBackupPath = path.join(serverBackupsDir, safetyBackupName);
-
-      await tar.c(
-        {
-          gzip: true,
-          file: safetyBackupPath,
-          cwd: path.dirname(serverWorldDir),
-        },
-        [worldDirName]
-      );
+      const backupResult = await createServerBackup({ server, purpose: BACKUP_PURPOSES.PRE_RESTORE });
+      if (backupResult.success && backupResult.filename) {
+        safetyBackupName = backupResult.filename;
+      }
     } catch {
       // Current live world directory did not exist; skip safety backup creation
     }

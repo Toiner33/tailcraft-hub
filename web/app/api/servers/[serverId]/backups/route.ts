@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
-import * as tar from 'tar';
 import { APP_CONFIG } from '@/lib/config';
 import { getServerById } from '@/lib/serverRegistry';
 import { formatBytes } from '@/lib/utils';
-import { getWorldDirName } from '@/lib/serverProperties';
+import { createServerBackup } from '@/lib/backupManager';
+import { BACKUP_PURPOSES } from '@/types/backup';
 
 const BACKUP_EXTENSION = '.tar.gz';
 
@@ -87,50 +87,23 @@ export async function POST(
       );
     }
 
-    // Read the backups directory for the specified server
-    const serverBackupsDir = path.join(APP_CONFIG.serversRootDir, serverId, APP_CONFIG.backupsDir); 
-    await ensureDirectoryExists(serverBackupsDir);
-
-    // Dynamically resolve world folder name from server.properties
-    const worldDirName = await getWorldDirName(serverId);
-    const serverWorldDir = path.join(APP_CONFIG.serversRootDir, serverId, worldDirName);
-
-    // Verify world folder exists
-    try {
-      await fs.access(serverWorldDir);
-    } catch {
+    // Use centralized backup manager with user-trigger purpose (includes disk checks & naming)
+    const backupResult = await createServerBackup({ server, purpose: BACKUP_PURPOSES.USER_TRIGGER });
+    if (!backupResult.success || !backupResult.filename || backupResult.sizeBytes === undefined) {
       return NextResponse.json(
-        { success: false, error: `World directory (${worldDirName}) does not exist.` },
-        { status: 404 }
+        { success: false, error: backupResult.error || 'Failed to create backup' },
+        { status: 500 }
       );
     }
-
-    // Create backup file incorporating [worldName]-[purpose]-backup-[engine]-[version]-[timestamp]
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const PURPOSE = 'user-trigger';
-    const backupFilename = `${worldDirName}-${PURPOSE}-backup-${server.engine}-${server.version}-${timestamp}${BACKUP_EXTENSION}`;
-    const destinationPath = path.join(serverBackupsDir, backupFilename);
-
-    // Create tar.gz stream from world directory
-    await tar.c(
-      {
-        gzip: true,
-        file: destinationPath,
-        cwd: path.dirname(serverWorldDir),
-      },
-      [worldDirName]
-    );
-
-    const stats = await fs.stat(destinationPath);
 
     return NextResponse.json({
       success: true,
       message: 'Backup created successfully.',
       backup: {
-        filename: backupFilename,
-        sizeBytes: stats.size,
-        formattedSize: formatBytes(stats.size),
-        createdAt: stats.birthtime.toISOString(),
+        filename: backupResult.filename,
+        sizeBytes: backupResult.sizeBytes,
+        formattedSize: formatBytes(backupResult.sizeBytes),
+        createdAt: new Date().toISOString(),
       },
     });
   } catch (error: unknown) {

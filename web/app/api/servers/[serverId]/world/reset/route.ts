@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
-import * as tar from 'tar';
 import { getContainerByServerId } from '@/lib/docker';
 import { APP_CONFIG } from '@/lib/config';
 import { getServerById } from '@/lib/serverRegistry';
 import { ServerProfile } from '@/types/server';
 import { getWorldDirName } from '@/lib/serverProperties';
+import { createServerBackup } from '@/lib/backupManager';
+import { BACKUP_PURPOSES } from '@/types/backup';
 
 interface ResetPayload {
   seed: string;
@@ -38,29 +39,11 @@ async function ensureServerStopped(serverId: string): Promise<void> {
  * Creates a safety backup of the existing world directory before wiping it.
  * Returns the generated backup filename, or an empty string if skipped.
  */
-async function createSafetyBackup(server: ServerProfile, worldDir: string, worldDirName: string): Promise<string> {
+async function createSafetyBackup(server: ServerProfile, worldDir: string): Promise<string> {
   try {
-    const BACKUP_EXTENSION = '.tar.gz';
-
-    const backupsDir = path.join(APP_CONFIG.serversRootDir, server.id, APP_CONFIG.backupsDir);
     await fs.access(worldDir);
-    await fs.mkdir(backupsDir, { recursive: true });
-
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const PURPOSE = 'pre-reset';
-    const safetyBackupName = `${worldDirName}-${PURPOSE}-backup-${server.engine}-${server.version}-${timestamp}${BACKUP_EXTENSION}`;
-    const safetyBackupPath = path.join(backupsDir, safetyBackupName);
-
-    await tar.c(
-      {
-        gzip: true,
-        file: safetyBackupPath,
-        cwd: path.dirname(worldDir),
-      },
-      [worldDirName]
-    );
-
-    return safetyBackupName;
+    const backupResult = await createServerBackup({ server, purpose: BACKUP_PURPOSES.PRE_RESET });
+    return backupResult.success && backupResult.filename ? backupResult.filename : '';
   } catch {
     // World folder did not exist or backup failed
     return '';
@@ -153,7 +136,7 @@ export async function POST(
     const worldDir = path.join(APP_CONFIG.serversRootDir, server.id, worldDirName);
 
     // 2. Take Pre-Reset Safety Backup & Wipe World Directory
-    const safetyBackupName = await createSafetyBackup(server, worldDir, worldDirName);
+    const safetyBackupName = await createSafetyBackup(server, worldDir);
     await resetWorldDirectory(worldDir);
 
     // 3. Update server.properties cleanly

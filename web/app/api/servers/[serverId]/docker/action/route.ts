@@ -7,6 +7,8 @@ import { APP_CONFIG } from '@/lib/config';
 import { ServerProfile } from '@/types/server';
 import { DOCKER_ACTIONS, DockerAction, getValidActionsList, isInvalidDockerAction } from '@/types/dockerActions';
 import { DOCKER_IMAGE, SERVER_DEFAULTS_FALLBACKS } from '@/lib/constants';
+import { BACKUP_PURPOSES } from '@/types/backup';
+import { createServerBackup } from '@/lib/backupManager';
 
 function scheduleGameruleSync(server: ServerProfile, delayMs: number, eventLabel: string) {
   syncGamerulesOnStartup(server, delayMs).then((result) => {
@@ -35,6 +37,7 @@ export async function POST(
 
     const body = await request.json();
     const action = body.action as DockerAction;
+    const isRecreate = body.isRecreate === true; // Optional flag from client or handled via flow
 
     if (isInvalidDockerAction(action)) {
       return NextResponse.json(
@@ -72,11 +75,11 @@ export async function POST(
           name: `${server.id}`,
           Image: `${DOCKER_IMAGE.name}:${DOCKER_IMAGE.tag}`,
           Env: [
-            'EULA=TRUE', // Accept the Minecraft EULA, required for the server to run.
+            'EULA=TRUE',
             `TYPE=${server.engine || SERVER_DEFAULTS_FALLBACKS.engine}`,
             `VERSION=${server.version || SERVER_DEFAULTS_FALLBACKS.version}`,
             `MEMORY=${memoryStr}`,
-            'ENABLE_RCON=true', // Enable RCON for remote console access. Required for Tailcraft Hub.
+            'ENABLE_RCON=true',
             `RCON_PASSWORD=${rconPassword}`,
             `RCON_PORT=${rconPort}`,
           ],
@@ -119,11 +122,20 @@ export async function POST(
         scheduleGameruleSync(server, 5000, DOCKER_ACTIONS.RESTART);
         break;
 
-      case DOCKER_ACTIONS.DELETE:
+      case DOCKER_ACTIONS.DELETE: {
         if (!container) throw new Error('Container instance is missing.');
-        // force: true automatically stops and removes the container whether it's running or stopped
+
+        // Optional safety backup before deletion if requested (e.g. during parameter updates/recreation)
+        if (body.createSafetyBackup === true) {
+          const backupResult = await createServerBackup({ server, purpose: BACKUP_PURPOSES.PRE_RECREATE });
+          if (!backupResult.success) {
+            console.warn(`[Backup Warning] Pre-recreate safety backup failed: ${backupResult.error}`);
+          }
+        }
+
         await container.remove({ force: true });
         break;
+      }
     }
 
     return NextResponse.json({

@@ -6,34 +6,15 @@ import si from 'systeminformation';
 import { getContainerByServerId } from '@/lib/docker';
 import { getServerById } from '@/lib/serverRegistry';
 import { APP_CONFIG } from '@/lib/config';
+import { getFolderSize } from '@/lib/utils';
 
 // --- Data Unit Conversion Factors ---
 const BYTES_PER_KB = 1024;
 const BYTES_PER_MB = BYTES_PER_KB * 1024;
 const BYTES_PER_GB = BYTES_PER_MB * 1024;
 
-const PERCENT_DECIMALS = 1;
+const PERCENT_DECIMALS = 2;
 const NO_DECIMALS = 0;
-
-// --- Helper function to calculate folder size recursively ---
-async function getFolderSize(dirPath: string): Promise<number> {
-  let totalSizeBytes = 0;
-  try {
-    const files = await fs.readdir(dirPath, { withFileTypes: true });
-    for (const file of files) {
-      const filePath = path.join(dirPath, file.name);
-      if (file.isDirectory()) {
-        totalSizeBytes += await getFolderSize(filePath);
-      } else if (file.isFile()) {
-        const stats = await fs.stat(filePath);
-        totalSizeBytes += stats.size;
-      }
-    }
-  } catch {
-    // Return 0 if directory is missing or inaccessible
-  }
-  return totalSizeBytes;
-}
 
 export async function GET(
   request: Request,
@@ -93,26 +74,36 @@ export async function GET(
       // Container not found or docker daemon issue — safely keep defaults (0)
     }
 
-    // --- World Data Directory Size ---
+    // --- World Data Directory Size using shared util ---
     const serverFolder = path.join(APP_CONFIG.serversRootDir, server.id);
     const folderSizeBytes = await getFolderSize(serverFolder);
 
-    // --- Host Machine Metrics ---
+// --- Host Machine RAM Metrics ---
     const memData = await si.mem();
     const hostRamUsedBytes = memData.active;
     const hostRamTotalBytes = memData.total;
     const hostRamPercent = ((hostRamUsedBytes / hostRamTotalBytes) * 100).toFixed(PERCENT_DECIMALS);
 
-    const fsData = await si.fsSize();
-    const primaryDisk = fsData[0] || { size: 0, used: 0, available: 0, use: 0 };
-
     if (hostRamTotalBytes > 0) {
       containerVsHostRamPercent = ((containerRamBytes / hostRamTotalBytes) * 100).toFixed(PERCENT_DECIMALS);
     }
 
-    const folderVsDiskPercent = primaryDisk.size > 0 
-      ? ((folderSizeBytes / primaryDisk.size) * 100).toFixed(PERCENT_DECIMALS) 
-      : '0.0';
+    // --- Disk Metrics via Native fs.statfs (Container & Host Safe) ---
+    let diskSize = 0;
+    let diskFree = 0;
+    let folderVsDiskPercent = '0.0';
+
+    try {
+      const stats = await fs.statfs(APP_CONFIG.serversRootDir);
+      diskSize = stats.blocks * stats.bsize;
+      diskFree = stats.bavail * stats.bsize;
+      
+      if (diskSize > 0) {
+        folderVsDiskPercent = ((folderSizeBytes / diskSize) * 100).toFixed(PERCENT_DECIMALS);
+      }
+    } catch {
+      // Fallback if statfs fails on the environment
+    }
 
     return NextResponse.json({
       success: true,
@@ -128,8 +119,8 @@ export async function GET(
           folderSizeMB: (folderSizeBytes / BYTES_PER_MB).toFixed(PERCENT_DECIMALS),
           folderSizeGB: (folderSizeBytes / BYTES_PER_GB).toFixed(PERCENT_DECIMALS),
           folderVsDiskPercent: folderVsDiskPercent,
-          diskFreeGB: (primaryDisk.available / BYTES_PER_GB).toFixed(PERCENT_DECIMALS),
-          diskTotalGB: (primaryDisk.size / BYTES_PER_GB).toFixed(PERCENT_DECIMALS),
+          diskFreeGB: (diskFree / BYTES_PER_GB).toFixed(PERCENT_DECIMALS),
+          diskTotalGB: (diskSize / BYTES_PER_GB).toFixed(PERCENT_DECIMALS),
         },
         host: {
           cpuCores: os.cpus().length,
