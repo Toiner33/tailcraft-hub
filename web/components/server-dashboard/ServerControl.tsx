@@ -114,7 +114,6 @@ export function ServerControl() {
 
   return (
     <PanelCard
-      className="max-w-md"
       title={<span className="block truncate">{status?.name || 'Minecraft Server'}</span>}
       actions={<Badge variant={badge.variant}>{badge.label}</Badge>}
       loading={statusLoading}

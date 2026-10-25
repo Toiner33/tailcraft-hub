@@ -1,17 +1,15 @@
 'use client';
 
 import { MetricCard } from '@/components/shared/MetricCard';
+import { useServer } from '@/components/server-dashboard/ServerProvider';
 import { useApiResource } from '@/hooks/use-api-resource';
 import type { MetricsData } from '@/types/metrics';
 
 const METRICS_POLL_MS = 3000;
 const EMPTY = '---';
 
-interface ResourceMetricsProps {
-  serverId: string;
-}
-
-export function ResourceMetrics({ serverId }: ResourceMetricsProps) {
+export function ResourceMetrics() {
+  const { serverId } = useServer();
   // On a failed refresh the hook keeps the last good data, like the old version did.
   const { data } = useApiResource<{ metrics: MetricsData }>(`/api/servers/${serverId}/metrics`, {
     intervalMs: METRICS_POLL_MS,
@@ -19,7 +17,7 @@ export function ResourceMetrics({ serverId }: ResourceMetricsProps) {
   const metrics = data?.metrics ?? null;
 
   return (
-    <div className="my-8 grid w-full grid-cols-1 gap-6 md:grid-cols-3">
+    <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-3">
       <MetricCard
         title="Minecraft Container"
         accent="success"

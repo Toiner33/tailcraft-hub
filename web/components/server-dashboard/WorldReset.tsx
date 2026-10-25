@@ -7,13 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { OptionSelect } from '@/components/shared/OptionSelect';
 import { PanelCard } from '@/components/shared/PanelCard';
 import { StatusBanner } from '@/components/shared/StatusBanner';
 import { useServer } from '@/components/server-dashboard/ServerProvider';
@@ -35,40 +29,6 @@ const DIFFICULTIES = [
   { value: 'normal', label: 'Normal' },
   { value: 'hard', label: 'Hard' },
 ];
-
-function OptionSelect({
-  id,
-  value,
-  options,
-  onChange,
-}: {
-  id: string;
-  value: string;
-  options: { value: string; label: string }[];
-  onChange: (value: string) => void;
-}) {
-  const currentLabel = options.find((option) => option.value === value)?.label ?? value;
-
-  return (
-    <Select
-      value={value}
-      onValueChange={(next) => {
-        if (next) onChange(next);
-      }}
-    >
-      <SelectTrigger id={id} className="w-full">
-        <SelectValue>{currentLabel}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
 
 function ToggleRow({
   title,

@@ -5,6 +5,7 @@ import { cn } from 'cn';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PanelCard } from '@/components/shared/PanelCard';
+import { useServer } from '@/components/server-dashboard/ServerProvider';
 import { apiFetch } from '@/lib/apiClient';
 
 interface LogEntry {
@@ -18,11 +19,8 @@ const LINE_STYLE: Record<LogEntry['type'], string> = {
   error: 'text-destructive',
 };
 
-interface RconConsoleProps {
-  serverId: string;
-}
-
-export function RconConsole({ serverId }: RconConsoleProps) {
+export function RconConsole() {
+  const { serverId } = useServer();
   const [command, setCommand] = useState('');
   const [logs, setLogs] = useState<LogEntry[]>([
     { type: 'output', text: 'TailCraft RCON Terminal Ready.' },
@@ -62,7 +60,6 @@ export function RconConsole({ serverId }: RconConsoleProps) {
 
   return (
     <PanelCard
-      className="max-w-2xl"
       title={
         <span className="flex items-center gap-2">
           <span className="size-3 animate-pulse rounded-full bg-success" />

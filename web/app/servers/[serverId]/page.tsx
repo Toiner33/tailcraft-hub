@@ -1,66 +1,47 @@
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
-
+import { ServerDashboardTabs } from '@/components/server-dashboard/ServerDashboardTabs';
 import { ServerProvider } from '@/components/server-dashboard/ServerProvider';
-import { ServerControl } from '@/components/server-dashboard/ServerControl';
-import { ServerPropertiesEditor } from '@/components/server-dashboard/ServerPropertiesEditor';
-import { BackupManager } from '@/components/server-dashboard/BackupManager';
-import { WorldReset } from '@/components/server-dashboard/WorldReset';
-import { DimensionAnalytics } from '@/components/server-dashboard/DimensionAnalytics';
-import { GameRulesPanel } from '@/components/server-dashboard/GameRulesPanel';
-import { RconConsole } from '@/components/server-dashboard/RconConsole';
-import { DockerLogs } from '@/components/server-dashboard/DockerLogs';
-import { ResourceMetrics } from '@/components/server-dashboard/ResourceMetrics';
+import { parseDashboardTab } from '@/lib/dashboardTabs';
 
 interface ServerDashboardPageProps {
-  params: Promise<{
-    serverId: string;
-  }>;
+  params: Promise<{ serverId: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function ServerDashboardPage({ params }: ServerDashboardPageProps) {
+export default async function ServerDashboardPage({
+  params,
+  searchParams,
+}: ServerDashboardPageProps) {
   const { serverId } = await params;
+  const { tab } = await searchParams;
+  const defaultTab = parseDashboardTab(Array.isArray(tab) ? tab[0] : tab);
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-start p-8 bg-zinc-950 text-zinc-100">
-      {/* Top Header & Navigation */}
-      <div className="w-full max-w-5xl mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white mb-1">
-            Server Management Hub
-          </h1>
-          <p className="text-xs text-zinc-400 font-mono">
-            Active Server ID: <span className="text-emerald-400 font-semibold">{serverId}</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Link href="/">
-            <Button variant="outline" className="border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs">
+    <main className="flex min-h-screen flex-col items-center justify-start bg-background p-8 text-foreground">
+      <div className="w-full max-w-5xl">
+        {/* Top header & navigation */}
+        <div className="mb-8 flex flex-col justify-between gap-4 border-b pb-6 sm:flex-row sm:items-center">
+          <div>
+            <h1 className="mb-1 text-3xl font-extrabold tracking-tight">Server Management Hub</h1>
+            <p className="font-mono text-xs text-muted-foreground">
+              Active Server ID: <span className="font-semibold text-success">{serverId}</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Link href="/" className={buttonVariants({ variant: 'outline' })}>
               ← Back to Home Menu
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      {/* One shared status poll for every panel inside the provider */}
-      <ServerProvider serverId={serverId}>
-        <div className="w-full max-w-5xl flex flex-col items-center space-y-6">
-          <ResourceMetrics serverId={serverId} />
-          <ServerControl />
-          <ServerPropertiesEditor />
-          <BackupManager />
-          <WorldReset />
-          <DimensionAnalytics />
-          <GameRulesPanel />
-          {/* Side-by-side or stacked terminal and logs */}
-          <div className="w-full max-w-5xl flex flex-col items-center space-y-6">
-            <RconConsole serverId={serverId} />
-            <DockerLogs serverId={serverId} />
+            </Link>
           </div>
         </div>
-      </ServerProvider>
+
+        {/* One shared status poll for every panel inside the provider */}
+        <ServerProvider serverId={serverId}>
+          <ServerDashboardTabs defaultTab={defaultTab} />
+        </ServerProvider>
+      </div>
     </main>
   );
 }
