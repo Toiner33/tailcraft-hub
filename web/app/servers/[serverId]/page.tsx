@@ -2,13 +2,14 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 
-import ServerControl from '@/components/ServerControl';
+import { ServerProvider } from '@/components/server-dashboard/ServerProvider';
+import { ServerControl } from '@/components/server-dashboard/ServerControl';
+import { BackupManager } from '@/components/server-dashboard/BackupManager';
+import { WorldReset } from '@/components/server-dashboard/WorldReset';
 import { RconConsole } from '@/components/server-dashboard/RconConsole';
 import { DockerLogs } from '@/components/server-dashboard/DockerLogs';
 import { ResourceMetrics } from '@/components/server-dashboard/ResourceMetrics';
 import ServerPropertiesEditor from '@/components/ServerPropertiesEditor';
-import BackupManager from '@/components/BackupManager';
-import WorldReset from '@/components/WorldReset';
 import DimensionAnalytics from '@/components/DimensionAnalytics';
 import GameRulesPanel from '@/components/GameRulesPanel';
 
@@ -43,21 +44,23 @@ export default async function ServerDashboardPage({ params }: ServerDashboardPag
         </div>
       </div>
 
-      {/* All 9 Components passing serverId */}
-      <div className="w-full max-w-5xl flex flex-col items-center space-y-6">
-        <ResourceMetrics serverId={serverId} />
-        <ServerControl serverId={serverId} />
-        <ServerPropertiesEditor serverId={serverId} />
-        <BackupManager serverId={serverId} />
-        <WorldReset serverId={serverId} />
-        <DimensionAnalytics serverId={serverId} />
-        <GameRulesPanel serverId={serverId} />
-        {/* Side-by-side or stacked terminal and logs */}
+      {/* One shared status poll for every panel inside the provider */}
+      <ServerProvider serverId={serverId}>
         <div className="w-full max-w-5xl flex flex-col items-center space-y-6">
-          <RconConsole serverId={serverId} />
-          <DockerLogs serverId={serverId} />
+          <ResourceMetrics serverId={serverId} />
+          <ServerControl />
+          <ServerPropertiesEditor serverId={serverId} />
+          <BackupManager />
+          <WorldReset />
+          <DimensionAnalytics serverId={serverId} />
+          <GameRulesPanel serverId={serverId} />
+          {/* Side-by-side or stacked terminal and logs */}
+          <div className="w-full max-w-5xl flex flex-col items-center space-y-6">
+            <RconConsole serverId={serverId} />
+            <DockerLogs serverId={serverId} />
+          </div>
         </div>
-      </div>
+      </ServerProvider>
     </main>
   );
 }

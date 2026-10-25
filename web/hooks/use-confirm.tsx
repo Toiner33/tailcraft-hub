@@ -9,15 +9,23 @@ export interface ConfirmOptions {
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: ConfirmVariant;
+  /** Adds a checkbox to the dialog. Its final state comes back from `confirmWithCheckbox`. */
+  checkbox?: { label: ReactNode; defaultChecked?: boolean };
+}
+
+export interface ConfirmResult {
+  confirmed: boolean;
+  /** State of the checkbox when the dialog closed (false if there is no checkbox). */
+  checked: boolean;
 }
 
 /**
  * Promise-based replacement for window.confirm().
  *
- *   const { confirm, confirmDialog } = useConfirm();
+ *   const { confirm, confirmWithCheckbox, confirmDialog } = useConfirm();
  *   ...
  *   const ok = await confirm({ title: 'Delete server?', variant: 'destructive' });
- *   if (!ok) return;
+ *   const { confirmed, checked } = await confirmWithCheckbox({ title: '...', checkbox: { label: '...' } });
  *   ...
  *   return (<>{...your JSX...}{confirmDialog}</>);
  *
@@ -27,26 +35,48 @@ export function useConfirm() {
   const [open, setOpen] = useState(false);
   // Options stay set after closing so the text does not vanish during the exit animation.
   const [options, setOptions] = useState<ConfirmOptions>({ title: '' });
-  const resolverRef = useRef<((confirmed: boolean) => void) | null>(null);
+  const [checked, setChecked] = useState(false);
+  const checkedRef = useRef(false);
+  const resolverRef = useRef<((result: ConfirmResult) => void) | null>(null);
 
   const settle = useCallback((confirmed: boolean) => {
-    resolverRef.current?.(confirmed);
+    resolverRef.current?.({ confirmed, checked: checkedRef.current });
     resolverRef.current = null;
     setOpen(false);
   }, []);
 
-  const confirm = useCallback((next: ConfirmOptions) => {
-    resolverRef.current?.(false); // an unanswered earlier confirm counts as "no"
+  const confirmWithCheckbox = useCallback((next: ConfirmOptions) => {
+    // An unanswered earlier question counts as "no".
+    resolverRef.current?.({ confirmed: false, checked: checkedRef.current });
+    checkedRef.current = next.checkbox?.defaultChecked ?? false;
+    setChecked(checkedRef.current);
     setOptions(next);
     setOpen(true);
-    return new Promise<boolean>((resolve) => {
+    return new Promise<ConfirmResult>((resolve) => {
       resolverRef.current = resolve;
     });
   }, []);
 
+  const confirm = useCallback(
+    async (next: ConfirmOptions) => (await confirmWithCheckbox(next)).confirmed,
+    [confirmWithCheckbox]
+  );
+
+  const handleCheckedChange = (value: boolean) => {
+    checkedRef.current = value;
+    setChecked(value);
+  };
+
+  const { checkbox, ...dialogOptions } = options;
+
   const confirmDialog = (
     <ConfirmDialog
-      {...options}
+      {...dialogOptions}
+      checkbox={
+        checkbox
+          ? { label: checkbox.label, checked, onCheckedChange: handleCheckedChange }
+          : undefined
+      }
       open={open}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) settle(false); // Cancel button or Escape key
@@ -55,5 +85,5 @@ export function useConfirm() {
     />
   );
 
-  return { confirm, confirmDialog };
+  return { confirm, confirmWithCheckbox, confirmDialog };
 }

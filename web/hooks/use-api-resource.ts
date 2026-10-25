@@ -35,7 +35,8 @@ function mergeResult<T extends object>(
  * - `loading` is true only until the first response (it does NOT flip back on
  *   later refreshes, so panels do not flash their loading state).
  * - `error` is set when the latest request failed; `data` keeps the last good value.
- * - `reload()` fetches now, e.g. after a POST that changed the data.
+ * - `reload()` fetches now, e.g. after a POST that changed the data. It resolves with
+ *   the fresh data (or null if the request failed), so callers can act on it right away.
  * - Polling skips ticks while the browser tab is hidden.
  */
 export function useApiResource<T extends object>(
@@ -74,10 +75,11 @@ export function useApiResource<T extends object>(
     };
   }, [url, enabled, intervalMs, refreshKey]);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (): Promise<T | null> => {
     const result = await apiFetch<T>(url);
-    if (latestUrlRef.current !== url) return; // URL changed while waiting
+    if (latestUrlRef.current !== url) return null; // URL changed while waiting
     setSnapshot((prev) => mergeResult(prev, url, result));
+    return result.success ? result : null;
   }, [url]);
 
   const current = snapshot && snapshot.url === url ? snapshot : null;

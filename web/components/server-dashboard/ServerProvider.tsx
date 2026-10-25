@@ -18,8 +18,8 @@ interface ServerContextValue {
   /** Latest Docker status, or null until the first response. */
   status: ServerStatus | null;
   statusLoading: boolean;
-  /** Fetch the status right now (e.g. after start/stop). */
-  refreshStatus: () => Promise<void>;
+  /** Fetch the status right now (e.g. after start/stop). Resolves with the fresh status, or null on failure. */
+  refreshStatus: () => Promise<ServerStatus | null>;
   /** Increases every time something changed the backups (restore, reset, safety backup...). */
   backupsVersion: number;
   notifyBackupsChanged: () => void;
