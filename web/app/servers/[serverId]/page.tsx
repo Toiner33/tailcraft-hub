@@ -3,9 +3,9 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 import ServerControl from '@/components/ServerControl';
-import RconConsole from '@/components/RconConsole';
-import DockerLogs from '@/components/DockerLogs';
-import ResourceMetrics from '@/components/ResourceMetrics';
+import { RconConsole } from '@/components/server-dashboard/RconConsole';
+import { DockerLogs } from '@/components/server-dashboard/DockerLogs';
+import { ResourceMetrics } from '@/components/server-dashboard/ResourceMetrics';
 import ServerPropertiesEditor from '@/components/ServerPropertiesEditor';
 import BackupManager from '@/components/BackupManager';
 import WorldReset from '@/components/WorldReset';
