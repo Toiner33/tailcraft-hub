@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 import ServerControl from '@/components/ServerControl';
 import RconConsole from '@/components/RconConsole';
@@ -32,11 +33,14 @@ export default async function ServerDashboardPage({ params }: ServerDashboardPag
             Active Server ID: <span className="text-emerald-400 font-semibold">{serverId}</span>
           </p>
         </div>
-        <Link href="/">
-          <Button variant="outline" className="border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs">
-            ← Back to Home Menu
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Link href="/">
+            <Button variant="outline" className="border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs">
+              ← Back to Home Menu
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* All 9 Components passing serverId */}
