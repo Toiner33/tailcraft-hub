@@ -30,9 +30,9 @@ export function ServerDashboardTabs({ defaultTab }: ServerDashboardTabsProps) {
 
   return (
     <Tabs defaultValue={defaultTab} onValueChange={handleTabChange} className="w-full">
-      <TabsList className="max-w-full overflow-x-auto">
+      <TabsList className="w-full rounded-full sm:w-fit">
         {DASHBOARD_TABS.map((tab) => (
-          <TabsTrigger key={tab.id} value={tab.id}>
+          <TabsTrigger key={tab.id} value={tab.id} className="rounded-full">
             {tab.label}
           </TabsTrigger>
         ))}

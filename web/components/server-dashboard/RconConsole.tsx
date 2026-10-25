@@ -13,6 +13,26 @@ interface LogEntry {
   text: string;
 }
 
+/**
+ * The RCON route nests the library result, so `response` can be an object like
+ * { success, response, error? } instead of a plain string. Accept both shapes.
+ */
+function parseRconReply(value: unknown): { ok: boolean; text: string } {
+  if (typeof value === 'string') return { ok: true, text: value };
+
+  if (typeof value === 'object' && value !== null) {
+    const reply = value as { success?: boolean; response?: unknown; error?: unknown };
+    const text = typeof reply.response === 'string' ? reply.response : '';
+    if (reply.success === false) {
+      const error = typeof reply.error === 'string' ? reply.error : text;
+      return { ok: false, text: error || 'RCON command failed.' };
+    }
+    return { ok: true, text };
+  }
+
+  return { ok: true, text: '' };
+}
+
 const LINE_STYLE: Record<LogEntry['type'], string> = {
   input: 'text-success font-semibold',
   output: 'text-foreground/80',
@@ -45,16 +65,21 @@ export function RconConsole() {
     addLog({ type: 'input', text: `> ${currentCommand}` });
     setSending(true);
 
-    const result = await apiFetch<{ response: string }>(`/api/servers/${serverId}/rcon/command`, {
+    const result = await apiFetch<{ response: unknown }>(`/api/servers/${serverId}/rcon/command`, {
       method: 'POST',
       body: { command: currentCommand },
     });
 
-    addLog(
-      result.success
-        ? { type: 'output', text: result.response }
-        : { type: 'error', text: `Error: ${result.error}` }
-    );
+    if (result.success) {
+      const reply = parseRconReply(result.response);
+      addLog(
+        reply.ok
+          ? { type: 'output', text: reply.text || '(command sent, no output)' }
+          : { type: 'error', text: `Error: ${reply.text}` }
+      );
+    } else {
+      addLog({ type: 'error', text: `Error: ${result.error}` });
+    }
     setSending(false);
   };
 
