@@ -4,14 +4,14 @@ import { ThemeToggle } from '@/components/theme-toggle';
 
 import { ServerProvider } from '@/components/server-dashboard/ServerProvider';
 import { ServerControl } from '@/components/server-dashboard/ServerControl';
+import { ServerPropertiesEditor } from '@/components/server-dashboard/ServerPropertiesEditor';
 import { BackupManager } from '@/components/server-dashboard/BackupManager';
 import { WorldReset } from '@/components/server-dashboard/WorldReset';
+import { DimensionAnalytics } from '@/components/server-dashboard/DimensionAnalytics';
+import { GameRulesPanel } from '@/components/server-dashboard/GameRulesPanel';
 import { RconConsole } from '@/components/server-dashboard/RconConsole';
 import { DockerLogs } from '@/components/server-dashboard/DockerLogs';
 import { ResourceMetrics } from '@/components/server-dashboard/ResourceMetrics';
-import ServerPropertiesEditor from '@/components/ServerPropertiesEditor';
-import DimensionAnalytics from '@/components/DimensionAnalytics';
-import GameRulesPanel from '@/components/GameRulesPanel';
 
 interface ServerDashboardPageProps {
   params: Promise<{
@@ -49,11 +49,11 @@ export default async function ServerDashboardPage({ params }: ServerDashboardPag
         <div className="w-full max-w-5xl flex flex-col items-center space-y-6">
           <ResourceMetrics serverId={serverId} />
           <ServerControl />
-          <ServerPropertiesEditor serverId={serverId} />
+          <ServerPropertiesEditor />
           <BackupManager />
           <WorldReset />
-          <DimensionAnalytics serverId={serverId} />
-          <GameRulesPanel serverId={serverId} />
+          <DimensionAnalytics />
+          <GameRulesPanel />
           {/* Side-by-side or stacked terminal and logs */}
           <div className="w-full max-w-5xl flex flex-col items-center space-y-6">
             <RconConsole serverId={serverId} />
