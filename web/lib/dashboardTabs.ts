@@ -4,7 +4,6 @@ export const DASHBOARD_TABS = [
   { id: 'console', label: 'Console' },
   { id: 'config', label: 'Config' },
   { id: 'world', label: 'World' },
-  { id: 'backups', label: 'Backups' },
 ] as const;
 
 export type DashboardTabId = (typeof DASHBOARD_TABS)[number]['id'];

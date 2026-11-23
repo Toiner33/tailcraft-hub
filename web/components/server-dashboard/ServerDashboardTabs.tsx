@@ -54,12 +54,9 @@ export function ServerDashboardTabs({ defaultTab }: ServerDashboardTabsProps) {
       </TabsContent>
 
       <TabsContent value="world" className="space-y-6 pt-4">
-        <WorldReset />
-        <DimensionAnalytics />
-      </TabsContent>
-
-      <TabsContent value="backups" className="space-y-6 pt-4">
         <BackupManager />
+        <DimensionAnalytics />
+        <WorldReset />
       </TabsContent>
     </Tabs>
   );

@@ -45,13 +45,11 @@ export function ServerActionButtons({
           <Button variant="warning" className="flex-1" disabled={actionPending} onClick={onRecreate}>
             Recreate Container
           </Button>
-          <Button
-            variant="destructive"
-            disabled={actionPending}
-            onClick={() => onAction(DOCKER_ACTIONS.DELETE)}
-          >
+        {!isRunning && (
+          <Button variant="destructive" disabled={actionPending} onClick={() => onAction(DOCKER_ACTIONS.DELETE)}>
             Delete
           </Button>
+        )}
         </div>
       </div>
     );
@@ -80,7 +78,7 @@ export function ServerActionButtons({
   }
 
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-2 gap-2">
       <Button
         variant="destructive"
         disabled={actionPending}
@@ -94,13 +92,6 @@ export function ServerActionButtons({
         onClick={() => onAction(DOCKER_ACTIONS.RESTART)}
       >
         Restart
-      </Button>
-      <Button
-        variant="destructive"
-        disabled={actionPending}
-        onClick={() => onAction(DOCKER_ACTIONS.DELETE)}
-      >
-        Delete
       </Button>
     </div>
   );
