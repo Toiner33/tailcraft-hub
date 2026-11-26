@@ -6,4 +6,6 @@ export interface ServerStatus {
   outOfSync?: boolean;
   startedAt?: string;
   name?: string;
+  /** Only set when the container does not exist: whether the world folder already has data. */
+  worldExists?: boolean;
 }

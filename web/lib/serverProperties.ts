@@ -85,3 +85,18 @@ export async function getWorldDirName(serverId: string): Promise<string> {
 
   return APP_CONFIG.worldDir || 'world';
 }
+
+/**
+ * True when the world folder exists and has real content. A missing or empty folder
+ * counts as "no world yet". (.DS_Store is ignored: macOS Finder can add it.)
+ */
+export async function worldFolderHasContent(serverId: string): Promise<boolean> {
+  try {
+    const worldDirName = await getWorldDirName(serverId);
+    const worldDir = path.join(APP_CONFIG.serversRootDir, serverId, worldDirName);
+    const entries = await fs.readdir(worldDir);
+    return entries.some((name) => name !== '.DS_Store');
+  } catch {
+    return false; // missing folder: no world yet
+  }
+}

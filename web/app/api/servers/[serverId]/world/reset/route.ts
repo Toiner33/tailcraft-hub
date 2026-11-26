@@ -15,6 +15,8 @@ interface ResetPayload {
   difficulty: string;
   hardcore: boolean;
   generateStructures: boolean;
+  /** First-time setup: only save the settings, do not back up or wipe anything. */
+  setupOnly?: boolean;
 }
 
 /**
@@ -71,39 +73,47 @@ async function resetWorldDirectory(worldDir: string): Promise<void> {
 
 /**
  * Updates server.properties with the new world generation parameters.
+ * Before the very first start the file does not exist yet, so it is created.
  */
 async function updateWorldProperties(server: ServerProfile, payload: ResetPayload): Promise<void> {
   const propertiesPath = path.join(APP_CONFIG.serversRootDir, server.id, APP_CONFIG.serverProperties);
+  const FILE_ENCODING = 'utf-8';
 
+  let content = '';
   try {
-    const FILE_ENCODING = 'utf-8';
-    let content = await fs.readFile(propertiesPath, FILE_ENCODING);
-    const LEGACY_GAMERULE_PREFIX = 'minecraft:';
-    const cleanLevelType = (payload.levelType || `${LEGACY_GAMERULE_PREFIX}normal`).replace(/\\:/g, ':');
-
-    const updates: Record<string, string> = {
-      'level-seed': payload.seed ?? '',
-      'level-type': cleanLevelType,
-      'difficulty': payload.difficulty ?? 'easy',
-      'hardcore': String(payload.hardcore ?? false),
-      'generate-structures': String(payload.generateStructures ?? true),
-    };
-
-    for (const [key, val] of Object.entries(updates)) {
-      const regex = new RegExp(`^${key}=.*$`, 'm');
-      if (regex.test(content)) {
-        content = content.replace(regex, `${key}=${val}`);
-      } else {
-        content += `\n${key}=${val}`;
-      }
-    }
-
-    // Clean up any surviving escaped colons across the entire file
-    content = content.replace(/\\:/g, ':');
-    await fs.writeFile(propertiesPath, content, FILE_ENCODING);
+    content = await fs.readFile(propertiesPath, FILE_ENCODING);
   } catch (err: unknown) {
-    console.warn('Could not update server.properties during reset:', err);
+    // A missing file is expected before the first start; anything else is a real problem.
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    await fs.mkdir(path.dirname(propertiesPath), { recursive: true });
   }
+
+  const LEGACY_GAMERULE_PREFIX = 'minecraft:';
+  const cleanLevelType = (payload.levelType || `${LEGACY_GAMERULE_PREFIX}normal`).replace(/\\:/g, ':');
+
+  const updates: Record<string, string> = {
+    'level-seed': payload.seed ?? '',
+    'level-type': cleanLevelType,
+    'difficulty': payload.difficulty ?? 'easy',
+    'hardcore': String(payload.hardcore ?? false),
+    'generate-structures': String(payload.generateStructures ?? true),
+  };
+
+  if (content && !content.endsWith('\n')) content += '\n';
+
+  for (const [key, val] of Object.entries(updates)) {
+    const regex = new RegExp(`^${key}=.*$`, 'm');
+    if (regex.test(content)) {
+      // A replacement function avoids special `$` patterns in the value being interpreted
+      content = content.replace(regex, () => `${key}=${val}`);
+    } else {
+      content += `${key}=${val}\n`;
+    }
+  }
+
+  // Clean up any surviving escaped colons across the entire file
+  content = content.replace(/\\:/g, ':');
+  await fs.writeFile(propertiesPath, content, FILE_ENCODING);
 }
 
 export async function POST(
@@ -129,6 +139,15 @@ export async function POST(
       await ensureServerStopped(server.id);
     } catch (err: any) {
       return NextResponse.json({ success: false, error: err.message }, { status: 400 });
+    }
+
+    // First-time setup: there is no world to back up or wipe, only store the settings.
+    if (body.setupOnly) {
+      await updateWorldProperties(server, body);
+      return NextResponse.json({
+        success: true,
+        message: 'World settings saved. They apply when the server first starts.',
+      });
     }
 
     // Dynamically resolve active world folder name from server.properties

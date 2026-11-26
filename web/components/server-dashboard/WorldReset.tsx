@@ -1,76 +1,30 @@
 'use client';
 
 import { useState } from 'react';
-import { Dices, TriangleAlert } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { OptionSelect } from '@/components/shared/OptionSelect';
 import { PanelCard } from '@/components/shared/PanelCard';
 import { StatusBanner } from '@/components/shared/StatusBanner';
 import { useServer } from '@/components/server-dashboard/ServerProvider';
+import {
+  DEFAULT_WORLD_SETTINGS,
+  WorldSettingsFields,
+  type WorldSettings,
+} from '@/components/server-dashboard/WorldSettingsFields';
 import { useConfirm } from '@/hooks/use-confirm';
 import { apiFetch } from '@/lib/apiClient';
 import type { StatusMessage } from '@/types/statusMessage';
-
-const LEVEL_TYPES = [
-  { value: 'minecraft:normal', label: 'Default (Normal)' },
-  { value: 'minecraft:flat', label: 'Superflat' },
-  { value: 'minecraft:large_biomes', label: 'Large Biomes' },
-  { value: 'minecraft:amplified', label: 'Amplified' },
-  { value: 'minecraft:single_biome_surface', label: 'Single Biome' },
-];
-
-const DIFFICULTIES = [
-  { value: 'peaceful', label: 'Peaceful' },
-  { value: 'easy', label: 'Easy' },
-  { value: 'normal', label: 'Normal' },
-  { value: 'hard', label: 'Hard' },
-];
-
-function ToggleRow({
-  title,
-  description,
-  checked,
-  onCheckedChange,
-}: {
-  title: string;
-  description: string;
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-card/60 p-2.5">
-      <span>
-        <span className="block text-xs font-semibold">{title}</span>
-        <span className="block text-[11px] text-muted-foreground">{description}</span>
-      </span>
-      <Checkbox checked={checked} onCheckedChange={onCheckedChange} />
-    </label>
-  );
-}
 
 export function WorldReset() {
   const { serverId, status, refreshStatus, notifyBackupsChanged } = useServer();
   const { confirm, confirmDialog } = useConfirm();
 
-  const [seed, setSeed] = useState('');
-  const [levelType, setLevelType] = useState('minecraft:normal');
-  const [difficulty, setDifficulty] = useState('normal');
-  const [hardcore, setHardcore] = useState(false);
-  const [generateStructures, setGenerateStructures] = useState(true);
-
+  const [settings, setSettings] = useState<WorldSettings>(DEFAULT_WORLD_SETTINGS);
   const [isResetting, setIsResetting] = useState(false);
   const [message, setMessage] = useState<StatusMessage | null>(null);
 
   const isServerRunning = Boolean(status?.running);
-
-  const handleGenerateSeed = () => {
-    // A random numeric seed that is safe as a JavaScript number
-    setSeed(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString());
-  };
 
   const handleResetWorld = async () => {
     // Ask the server for the current state instead of trusting the last poll.
@@ -97,7 +51,7 @@ export function WorldReset() {
 
     const result = await apiFetch<{ message: string }>(`/api/servers/${serverId}/world/reset`, {
       method: 'POST',
-      body: { seed, levelType, difficulty, hardcore, generateStructures },
+      body: settings,
     });
 
     if (result.success) {
@@ -121,63 +75,10 @@ export function WorldReset() {
     >
       {message && <StatusBanner variant={message.variant}>{message.text}</StatusBanner>}
 
-      <div className="grid grid-cols-1 gap-4 rounded-lg border bg-muted/30 p-4 md:grid-cols-2">
-        <div className="grid gap-1.5 md:col-span-2">
-          <Label htmlFor="world-seed" className="text-xs font-semibold">
-            World Seed
-          </Label>
-          <div className="flex gap-2">
-            <Input
-              id="world-seed"
-              value={seed}
-              onChange={(event) => setSeed(event.target.value)}
-              placeholder="Leave blank for random or enter custom seed"
-              className="flex-1 font-mono"
-            />
-            <Button type="button" variant="outline" onClick={handleGenerateSeed}>
-              <Dices data-icon="inline-start" />
-              Randomize
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid gap-1.5">
-          <Label htmlFor="world-type" className="text-xs font-semibold">
-            World Type
-          </Label>
-          <OptionSelect
-            id="world-type"
-            value={levelType}
-            options={LEVEL_TYPES}
-            onChange={setLevelType}
-          />
-        </div>
-
-        <div className="grid gap-1.5">
-          <Label htmlFor="world-difficulty" className="text-xs font-semibold">
-            Difficulty
-          </Label>
-          <OptionSelect
-            id="world-difficulty"
-            value={difficulty}
-            options={DIFFICULTIES}
-            onChange={setDifficulty}
-          />
-        </div>
-
-        <ToggleRow
-          title="Hardcore Mode"
-          description="Permadeath & Hard difficulty lock"
-          checked={hardcore}
-          onCheckedChange={setHardcore}
-        />
-        <ToggleRow
-          title="Generate Structures"
-          description="Villages, temples, strongholds"
-          checked={generateStructures}
-          onCheckedChange={setGenerateStructures}
-        />
-      </div>
+      <WorldSettingsFields
+        value={settings}
+        onChange={(patch) => setSettings((prev) => ({ ...prev, ...patch }))}
+      />
 
       <div className="flex justify-end pt-2">
         <Button

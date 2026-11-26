@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getContainerByServerId } from '@/lib/docker';
 import { getServerById } from '@/lib/serverRegistry';
+import { worldFolderHasContent } from '@/lib/serverProperties';
 
 export async function GET(
   request: Request,
@@ -48,6 +49,8 @@ export async function GET(
         running: false,
         outOfSync: false,
         name: `${server.name}`,
+        // Only check for world existance if the container doesn't exist.
+        worldExists: await worldFolderHasContent(server.id),
       });
     }
   } catch (error: unknown) {
